@@ -26,9 +26,13 @@ export const userSchema = z.object({
 
 export const playerSchema = z.object({
   name: z.string().trim().min(1),
+  nickname: z.string().trim().optional(),
   role: playerRoleSchema,
+  battingStyle: z.string().trim().optional(),
+  bowlingStyle: z.string().trim().optional(),
   basePrice: z.number().int().nonnegative(),
   photoUrl: z.string().trim().url().or(z.literal("")),
+  phone: z.string().trim().optional(),
   active: z.boolean(),
 });
 

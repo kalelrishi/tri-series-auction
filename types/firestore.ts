@@ -28,9 +28,13 @@ export type UserDocument = BaseDocument &
 export type PlayerDocument = BaseDocument &
   AuditedTimestamps & {
     name: string;
+    nickname?: string;
     role: PlayerRole;
+    battingStyle?: string;
+    bowlingStyle?: string;
     basePrice: number;
     photoUrl: string;
+    phone?: string;
     active: boolean;
   };
 
