@@ -1,105 +1,95 @@
 import {
   addDoc,
-  collection,
-  doc,
+  deleteDoc,
   getDoc,
   getDocs,
   onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
   setDoc,
-  type DocumentData,
-  type FirestoreDataConverter,
+  updateDoc,
+  type CollectionReference,
+  type DocumentReference,
   type PartialWithFieldValue,
-  type QueryConstraint,
+  type Query,
   type Unsubscribe,
   type WithFieldValue,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
 
-function requireDb() {
-  if (!db) {
-    throw new Error("Firebase is not configured. Add NEXT_PUBLIC_FIREBASE_* env values.");
-  }
+type DocumentWithId = {
+  id: string;
+};
 
-  return db;
-}
-
-export function createConverter<T extends { id: string }>(): FirestoreDataConverter<T> {
-  return {
-    toFirestore(modelObject: WithFieldValue<T>): DocumentData {
-      const { id: _ignored, ...data } = modelObject as T;
-      void _ignored;
-      return data;
-    },
-    fromFirestore(snapshot) {
-      return {
-        id: snapshot.id,
-        ...snapshot.data(),
-      } as T;
-    },
-  };
-}
-
-export function typedCollection<T extends { id: string }>(path: string) {
-  return collection(requireDb(), path).withConverter(createConverter<T>());
-}
-
-export async function getById<T extends { id: string }>(
-  collectionPath: string,
-  id: string,
+export async function getDocument<TDocument extends DocumentWithId>(
+  ref: DocumentReference<TDocument>,
 ) {
-  const snapshot = await getDoc(
-    doc(requireDb(), collectionPath, id).withConverter(createConverter<T>()),
-  );
-
+  const snapshot = await getDoc(ref);
   return snapshot.exists() ? snapshot.data() : null;
 }
 
-export async function listAll<T extends { id: string }>(
-  collectionPath: string,
-  constraints: QueryConstraint[] = [orderBy("createdAt", "desc")],
+export async function getCollection<TDocument extends DocumentWithId>(
+  ref: CollectionReference<TDocument> | Query<TDocument>,
 ) {
-  const snapshot = await getDocs(
-    query(typedCollection<T>(collectionPath), ...constraints),
-  );
-
+  const snapshot = await getDocs(ref);
   return snapshot.docs.map((item) => item.data());
 }
 
-export async function createRecord<T extends { id: string }>(
-  collectionPath: string,
-  data: Omit<T, "id">,
+export async function addDocument<TDocument extends DocumentWithId>(
+  ref: CollectionReference<TDocument>,
+  data: WithFieldValue<Omit<TDocument, "id">>,
 ) {
-  return addDoc(typedCollection<T>(collectionPath), {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  } as WithFieldValue<T>);
+  return addDoc(ref, data as WithFieldValue<TDocument>);
 }
 
-export async function upsertRecord<T extends { id: string }>(
-  collectionPath: string,
-  id: string,
-  data: Partial<Omit<T, "id">>,
+export async function setDocument<TDocument extends DocumentWithId>(
+  ref: DocumentReference<TDocument>,
+  data: WithFieldValue<Omit<TDocument, "id">>,
 ) {
-  return setDoc(
-    doc(requireDb(), collectionPath, id).withConverter(createConverter<T>()),
-    {
-      ...data,
-      updatedAt: serverTimestamp(),
-    } as PartialWithFieldValue<T>,
-    { merge: true },
+  return setDoc(ref, data as WithFieldValue<TDocument>);
+}
+
+export async function mergeDocument<TDocument extends DocumentWithId>(
+  ref: DocumentReference<TDocument>,
+  data: PartialWithFieldValue<Omit<TDocument, "id">>,
+) {
+  return setDoc(ref, data as PartialWithFieldValue<TDocument>, { merge: true });
+}
+
+export async function updateDocument<TDocument extends DocumentWithId>(
+  ref: DocumentReference<TDocument>,
+  data: PartialWithFieldValue<Omit<TDocument, "id">>,
+) {
+  return updateDoc(ref, data as PartialWithFieldValue<TDocument>);
+}
+
+export async function removeDocument<TDocument extends DocumentWithId>(
+  ref: DocumentReference<TDocument>,
+) {
+  return deleteDoc(ref);
+}
+
+export function subscribeToDocument<TDocument extends DocumentWithId>(
+  ref: DocumentReference<TDocument>,
+  onNext: (document: TDocument | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    ref,
+    (snapshot) => {
+      onNext(snapshot.exists() ? snapshot.data() : null);
+    },
+    onError,
   );
 }
 
-export function subscribeToCollection<T extends { id: string }>(
-  collectionPath: string,
-  onNext: (items: T[]) => void,
-  constraints: QueryConstraint[] = [],
+export function subscribeToCollection<TDocument extends DocumentWithId>(
+  ref: CollectionReference<TDocument> | Query<TDocument>,
+  onNext: (documents: TDocument[]) => void,
+  onError?: (error: Error) => void,
 ): Unsubscribe {
-  return onSnapshot(query(typedCollection<T>(collectionPath), ...constraints), (snapshot) => {
-    onNext(snapshot.docs.map((item) => item.data()));
-  });
+  return onSnapshot(
+    ref,
+    (snapshot) => {
+      onNext(snapshot.docs.map((item) => item.data()));
+    },
+    onError,
+  );
 }
