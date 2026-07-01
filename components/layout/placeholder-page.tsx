@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ type PlaceholderPageProps = {
   description: string;
   actions?: PlaceholderAction[];
   stats: PlaceholderStat[];
+  children?: ReactNode;
 };
 
 export function PlaceholderPage({
@@ -30,6 +32,7 @@ export function PlaceholderPage({
   description,
   actions = [],
   stats,
+  children,
 }: PlaceholderPageProps) {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -91,6 +94,8 @@ export function PlaceholderPage({
           <StatCard key={stat.label} {...stat} />
         ))}
       </section>
+
+      {children}
 
       <Card>
         <CardHeader>

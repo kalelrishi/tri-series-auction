@@ -1,4 +1,5 @@
 import { Activity, Shield, Trophy, Users } from "lucide-react";
+import { FirebaseHealthcheck } from "@/components/firebase-healthcheck";
 import { PlaceholderPage } from "@/components/layout/placeholder-page";
 
 export default function HomePage() {
@@ -17,6 +18,8 @@ export default function HomePage() {
         { label: "Players per team", value: "7", icon: Trophy },
         { label: "Points per team", value: "400", icon: Activity },
       ]}
-    />
+    >
+      <FirebaseHealthcheck />
+    </PlaceholderPage>
   );
 }
