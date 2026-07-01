@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ElementType } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 import { cn } from "@/utils/cn";
 
 type ButtonProps = ComponentPropsWithoutRef<"button"> & {
@@ -21,17 +21,37 @@ const variants = {
 };
 
 export function Button(props: ButtonProps | LinkButtonProps) {
-  const { className, variant = "primary", asChild, ...rest } = props;
-  const classes = cn(
+  if (props.asChild) {
+    const { className, variant = "primary", asChild: _asChild, ...rest } = props;
+    void _asChild;
+    return <Link className={getButtonClasses(variant, className)} {...rest} />;
+  }
+
+  const {
+    className,
+    variant = "primary",
+    asChild: _asChild,
+    type = "button",
+    ...rest
+  } = props;
+  void _asChild;
+
+  return (
+    <button
+      className={getButtonClasses(variant, className)}
+      type={type}
+      {...rest}
+    />
+  );
+}
+
+function getButtonClasses(
+  variant: NonNullable<ButtonProps["variant"]>,
+  className?: string,
+) {
+  return cn(
     "inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 disabled:pointer-events-none disabled:opacity-50",
     variants[variant],
     className,
   );
-
-  if (asChild) {
-    const Component = Link as ElementType;
-    return <Component className={classes} {...rest} />;
-  }
-
-  return <button className={classes} {...rest} />;
 }
