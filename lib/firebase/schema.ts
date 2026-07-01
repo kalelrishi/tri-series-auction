@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { FirestoreTimestamp } from "@/types";
 
 export const userRoleSchema = z.enum(["admin", "captain"]);
 
@@ -40,7 +41,7 @@ export const settingsSchema = z.object({
 
 export const auctionDetailsSchema = z.object({
   name: z.string().trim().min(1),
-  date: z.unknown(),
+  date: z.custom<FirestoreTimestamp>(),
   status: auctionStatusSchema,
   budgetPerTeam: z.number().int().positive(),
   playersPerTeam: z.number().int().positive(),

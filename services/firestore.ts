@@ -5,7 +5,6 @@ import {
   getDocs,
   onSnapshot,
   setDoc,
-  updateDoc,
   type CollectionReference,
   type DocumentReference,
   type PartialWithFieldValue,
@@ -51,13 +50,6 @@ export async function mergeDocument<TDocument extends DocumentWithId>(
   data: PartialWithFieldValue<Omit<TDocument, "id">>,
 ) {
   return setDoc(ref, data as PartialWithFieldValue<TDocument>, { merge: true });
-}
-
-export async function updateDocument<TDocument extends DocumentWithId>(
-  ref: DocumentReference<TDocument>,
-  data: PartialWithFieldValue<Omit<TDocument, "id">>,
-) {
-  return updateDoc(ref, data as PartialWithFieldValue<TDocument>);
 }
 
 export async function removeDocument<TDocument extends DocumentWithId>(
