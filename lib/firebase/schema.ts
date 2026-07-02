@@ -36,6 +36,35 @@ export const playerSchema = z.object({
   active: z.boolean(),
 });
 
+export const teamSchema = z.object({
+  name: z.string().trim().min(1),
+  captainId: z.string().trim().min(1),
+  captainName: z.string().trim().min(1),
+  color: z.string().trim().min(1),
+  budgetTotal: z.number().int().nonnegative(),
+  budgetRemaining: z.number().int().nonnegative(),
+  players: z.array(
+    z.object({
+      playerId: z.string().trim().min(1),
+      playerName: z.string().trim().min(1),
+      role: playerRoleSchema,
+      purchasePrice: z.number().int().nonnegative(),
+      isCaptain: z.boolean(),
+      joinedAt: z.custom<FirestoreTimestamp>(),
+    }),
+  ),
+  playersCount: z.number().int().nonnegative(),
+});
+
+export const createTeamSchema = z.object({
+  name: z.string().trim().min(1),
+  captainId: z.string().trim().min(1),
+  captainName: z.string().trim().min(1),
+  captainRole: playerRoleSchema,
+  color: z.string().trim().min(1),
+  budgetTotal: z.number().int().nonnegative(),
+});
+
 export const settingsSchema = z.object({
   defaultBudget: z.number().int().positive(),
   defaultPlayersPerTeam: z.number().int().positive(),

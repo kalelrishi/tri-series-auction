@@ -38,6 +38,27 @@ export type PlayerDocument = BaseDocument &
     active: boolean;
   };
 
+export type TeamPlayer = {
+  playerId: string;
+  playerName: string;
+  role: PlayerRole;
+  purchasePrice: number;
+  isCaptain: boolean;
+  joinedAt: FirestoreTimestamp;
+};
+
+export type TeamDocument = BaseDocument &
+  AuditedTimestamps & {
+    name: string;
+    captainId: string;
+    captainName: string;
+    color: string;
+    budgetTotal: number;
+    budgetRemaining: number;
+    players: TeamPlayer[];
+    playersCount: number;
+  };
+
 export type SettingsDocument = BaseDocument & {
   defaultBudget: number;
   defaultPlayersPerTeam: number;
@@ -103,6 +124,15 @@ export type CreatePlayerInput = Omit<
 >;
 export type UpdatePlayerInput = Partial<CreatePlayerInput>;
 
+export type CreateTeamInput = {
+  name: string;
+  captainId: string;
+  captainName: string;
+  captainRole: PlayerRole;
+  color: string;
+  budgetTotal: number;
+};
+
 export type UpsertSettingsInput = Omit<SettingsDocument, "id">;
 
 export type CreateAuctionDetailsInput = Omit<
@@ -125,6 +155,7 @@ export type CreateHistoryInput = Omit<HistoryDocument, "id" | "timestamp">;
 export type CollectionDocumentMap = {
   users: UserDocument;
   players: PlayerDocument;
+  teams: TeamDocument;
   settings: SettingsDocument;
   auctionDetails: AuctionDetailsDocument;
   auctionState: AuctionStateDocument;

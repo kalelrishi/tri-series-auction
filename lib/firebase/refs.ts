@@ -23,6 +23,7 @@ import type {
   HistoryDocument,
   PlayerDocument,
   SettingsDocument,
+  TeamDocument,
   UserDocument,
 } from "@/types";
 
@@ -72,6 +73,14 @@ export function playersCollection() {
 
 export function playerDoc(playerId: string) {
   return typedDoc<PlayerDocument>(ROOT_COLLECTIONS.players, playerId);
+}
+
+export function teamsCollection() {
+  return typedCollection<TeamDocument>(ROOT_COLLECTIONS.teams);
+}
+
+export function teamDoc(teamId: string) {
+  return typedDoc<TeamDocument>(ROOT_COLLECTIONS.teams, teamId);
 }
 
 export function settingsDoc() {
