@@ -23,7 +23,6 @@ import type {
   PlayerDocument,
   PlayerRole,
 } from "@/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils/cn";
@@ -70,6 +69,7 @@ export function PlayersClient() {
   const [editingPlayer, setEditingPlayer] = useState<PlayerDocument | null>(
     null,
   );
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
   async function loadPlayers() {
@@ -94,6 +94,25 @@ export function PlayersClient() {
     () => players.filter((player) => player.active).length,
     [players],
   );
+
+  async function togglePlayerStatus(player: PlayerDocument) {
+    setUpdatingStatusId(player.id);
+    try {
+      await updatePlayer(player.id, { active: !player.active });
+      setToast({
+        type: "success",
+        message: `${player.name} marked ${player.active ? "inactive" : "active"}.`,
+      });
+      await loadPlayers();
+    } catch {
+      setToast({
+        type: "error",
+        message: "Unable to update player status. Please try again.",
+      });
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -128,6 +147,10 @@ export function PlayersClient() {
           setEditingPlayer(player);
           setOpen(true);
         }}
+        onToggleStatus={(player) => {
+          void togglePlayerStatus(player);
+        }}
+        updatingStatusId={updatingStatusId}
       />
 
       {open ? (
@@ -166,10 +189,14 @@ function PlayersList({
   players,
   loading,
   onEdit,
+  onToggleStatus,
+  updatingStatusId,
 }: {
   players: PlayerDocument[];
   loading: boolean;
   onEdit: (player: PlayerDocument) => void;
+  onToggleStatus: (player: PlayerDocument) => void;
+  updatingStatusId: string | null;
 }) {
   if (loading) {
     return (
@@ -218,7 +245,12 @@ function PlayersList({
                 <td className="px-5 py-4">{player.role}</td>
                 <td className="px-5 py-4">{formatPoints(player.basePrice)}</td>
                 <td className="px-5 py-4">
-                  <StatusBadge active={player.active} />
+                  <StatusBadge
+                    active={player.active}
+                    disabled={updatingStatusId === player.id}
+                    playerName={player.name}
+                    onClick={() => onToggleStatus(player)}
+                  />
                 </td>
                 <td className="px-5 py-4 text-right">
                   <Button
@@ -249,7 +281,12 @@ function PlayersList({
                   {player.nickname || "No nickname"}
                 </p>
               </div>
-              <StatusBadge active={player.active} />
+              <StatusBadge
+                active={player.active}
+                disabled={updatingStatusId === player.id}
+                playerName={player.name}
+                onClick={() => onToggleStatus(player)}
+              />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
@@ -473,17 +510,32 @@ function Field({
   );
 }
 
-function StatusBadge({ active }: { active: boolean }) {
+function StatusBadge({
+  active,
+  disabled,
+  onClick,
+  playerName,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  playerName: string;
+}) {
   return (
-    <Badge
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={`Mark ${playerName} as ${active ? "inactive" : "active"}`}
       className={cn(
+        "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-60",
         active
           ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"
           : "border-slate-400/25 bg-slate-400/10 text-slate-300",
       )}
     >
-      {active ? "Active" : "Inactive"}
-    </Badge>
+      {disabled ? "Updating" : active ? "Active" : "Inactive"}
+    </button>
   );
 }
 
