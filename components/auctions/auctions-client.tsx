@@ -1,39 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Timestamp } from "firebase/firestore";
 import {
+  CalendarDays,
   CheckCircle2,
+  Gavel,
   Loader2,
   Plus,
-  Shield,
   Trophy,
   X,
   XCircle,
 } from "lucide-react";
-import { teamSchema } from "@/lib/firebase/schema";
-import {
-  createTeam,
-  DuplicateTeamCaptainError,
-  listAvailableTeamCaptains,
-  listTeams,
-} from "@/services/teams-service";
-import { getOrCreateDefaultAuction } from "@/services/auctions-service";
-import type {
-  AuctionDocument,
-  CreateTeamInput,
-  PlayerDocument,
-  TeamDocument,
-} from "@/types";
+import { createAuction, listAuctions } from "@/services/auctions-service";
+import type { AuctionDocument, CreateAuctionInput } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils/cn";
 
-type TeamFormValues = {
+type AuctionFormValues = {
   name: string;
-  captainId: string;
-  color: string;
-  budgetTotal: number;
+  date: string;
+  startingBudget: number;
+  maxPlayersPerTeam: number;
 };
 
 type ToastState = {
@@ -41,43 +32,27 @@ type ToastState = {
   message: string;
 } | null;
 
-const TEAM_BUDGET = 400;
-const teamFormSchema = teamSchema.pick({
-  name: true,
-  captainId: true,
-  color: true,
-});
-
-const defaultValues: TeamFormValues = {
+const defaultValues: AuctionFormValues = {
   name: "",
-  captainId: "",
-  color: "#34d399",
-  budgetTotal: TEAM_BUDGET,
+  date: new Date().toISOString().slice(0, 10),
+  startingBudget: 400,
+  maxPlayersPerTeam: 7,
 };
 
-export function TeamsClient() {
-  const [auction, setAuction] = useState<AuctionDocument | null>(null);
-  const [teams, setTeams] = useState<TeamDocument[]>([]);
-  const [players, setPlayers] = useState<PlayerDocument[]>([]);
+export function AuctionsClient() {
+  const [auctions, setAuctions] = useState<AuctionDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
 
-  async function loadData() {
+  async function loadAuctions() {
     setLoading(true);
     try {
-      const activeAuction = await getOrCreateDefaultAuction();
-      const [nextTeams, nextPlayers] = await Promise.all([
-        listTeams(activeAuction.id),
-        listAvailableTeamCaptains(activeAuction.id),
-      ]);
-      setAuction(activeAuction);
-      setTeams(nextTeams);
-      setPlayers(nextPlayers);
+      setAuctions(await listAuctions());
     } catch {
       setToast({
         type: "error",
-        message: "Unable to load teams right now. Please try again.",
+        message: "Unable to load auctions right now. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -85,60 +60,46 @@ export function TeamsClient() {
   }
 
   useEffect(() => {
-    void loadData();
+    void loadAuctions();
   }, []);
-
-  const activePlayers = useMemo(
-    () => players.filter((player) => player.active),
-    [players],
-  );
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            Team Management
+            Auction Management
           </p>
           <h2 className="mt-2 text-3xl font-black tracking-normal text-white">
-            Teams
+            Auctions
           </h2>
           <p className="mt-2 text-sm text-slate-400">
-            {teams.length} teams created
-            {auction ? ` for ${auction.name}` : ""}
+            {auctions.length} auctions available
           </p>
         </div>
         <Button type="button" onClick={() => setOpen(true)}>
           <Plus className="size-4" aria-hidden="true" />
-          Create Team
+          Create Auction
         </Button>
       </div>
 
-      <TeamsList
-        loading={loading}
-        teams={teams}
-      />
+      <AuctionsList auctions={auctions} loading={loading} />
 
       {open ? (
-        <CreateTeamDialog
-          auctionId={auction?.id}
-          activePlayers={activePlayers}
+        <CreateAuctionDialog
           onClose={() => setOpen(false)}
           onSaved={async () => {
             setOpen(false);
             setToast({
               type: "success",
-              message: "Team created successfully.",
+              message: "Auction created successfully.",
             });
-            await loadData();
+            await loadAuctions();
           }}
-          onError={(error) => {
+          onError={() => {
             setToast({
               type: "error",
-              message:
-                error instanceof DuplicateTeamCaptainError
-                  ? "This player is already captain of another team."
-                  : "Unable to create team. Please check the form and try again.",
+              message: "Unable to create auction. Please check the form and try again.",
             });
           }}
         />
@@ -149,29 +110,29 @@ export function TeamsClient() {
   );
 }
 
-function TeamsList({
+function AuctionsList({
+  auctions,
   loading,
-  teams,
 }: {
+  auctions: AuctionDocument[];
   loading: boolean;
-  teams: TeamDocument[];
 }) {
   if (loading) {
     return (
       <Card className="flex min-h-56 items-center justify-center p-8 text-slate-300">
         <Loader2 className="mr-3 size-5 animate-spin text-cyan-200" />
-        Loading teams...
+        Loading auctions...
       </Card>
     );
   }
 
-  if (teams.length === 0) {
+  if (auctions.length === 0) {
     return (
       <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
-        <Shield className="size-10 text-slate-500" aria-hidden="true" />
-        <p className="mt-4 text-lg font-semibold text-white">No teams yet</p>
+        <Gavel className="size-10 text-slate-500" aria-hidden="true" />
+        <p className="mt-4 text-lg font-semibold text-white">No auctions yet</p>
         <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-          Create the first team and assign an active player as captain.
+          Create an auction to begin managing teams for that auction.
         </p>
       </Card>
     );
@@ -179,63 +140,52 @@ function TeamsList({
 
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {teams.map((team) => (
-        <Card key={team.id} className="overflow-hidden">
-          <div
-            className="h-2"
-            style={{ backgroundColor: team.color }}
-            aria-hidden="true"
-          />
-          <div className="p-5">
+      {auctions.map((auction) => (
+        <Link key={auction.id} href={`/auctions/${auction.id}`}>
+          <Card className="h-full p-5 transition hover:border-emerald-300/40 hover:bg-white/[0.075]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="truncate text-xl font-bold text-white">
-                  {team.name}
+                  {auction.name}
                 </h3>
                 <p className="mt-2 flex items-center gap-2 text-sm text-slate-400">
-                  <Trophy className="size-4 text-emerald-200" aria-hidden="true" />
-                  {team.captainName || "Unknown captain"}
+                  <CalendarDays className="size-4 text-emerald-200" aria-hidden="true" />
+                  {formatDate(auction.date)}
                 </p>
               </div>
-              <span
-                className="size-10 shrink-0 rounded-md border border-white/15"
-                style={{ backgroundColor: team.color }}
-                aria-label={`${team.name} team color`}
-              />
+              <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">
+                {auction.status}
+              </span>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-slate-400">Budget Remaining</p>
+                <p className="text-slate-400">Starting Budget</p>
                 <p className="mt-1 font-semibold text-white">
-                  {formatPoints(team.budgetRemaining)}
+                  {formatPoints(auction.startingBudget)}
                 </p>
               </div>
               <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-slate-400">Players</p>
+                <p className="text-slate-400">Max Players</p>
                 <p className="mt-1 font-semibold text-white">
-                  {team.playersCount ?? team.players?.length ?? 0} / 7
+                  {auction.maxPlayersPerTeam}
                 </p>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </Link>
       ))}
     </section>
   );
 }
 
-function CreateTeamDialog({
-  activePlayers,
-  auctionId,
+function CreateAuctionDialog({
   onClose,
   onError,
   onSaved,
 }: {
-  activePlayers: PlayerDocument[];
-  auctionId?: string;
   onClose: () => void;
-  onError: (error: unknown) => void;
+  onError: () => void;
   onSaved: () => Promise<void>;
 }) {
   const {
@@ -244,53 +194,27 @@ function CreateTeamDialog({
     register,
     reset,
     setError,
-  } = useForm<TeamFormValues>({ defaultValues });
+  } = useForm<AuctionFormValues>({ defaultValues });
 
-  async function onSubmit(values: TeamFormValues) {
-    const captain = activePlayers.find(
-      (player) => player.id === values.captainId,
-    );
-
-    if (!captain) {
-      setError("captainId", {
-        message: "Select an active player as captain.",
-      });
+  async function onSubmit(values: AuctionFormValues) {
+    if (!values.name.trim()) {
+      setError("name", { message: "Auction name is required." });
       return;
     }
 
-    if (!auctionId) {
-      onError(new Error("Auction is not ready."));
-      return;
-    }
-
-    const payload: CreateTeamInput = {
+    const payload: CreateAuctionInput = {
       name: values.name,
-      captainId: values.captainId,
-      captainName: captain.name,
-      captainRole: captain.role,
-      color: values.color,
-      budgetTotal: TEAM_BUDGET,
+      date: Timestamp.fromDate(new Date(`${values.date}T00:00:00`)),
+      startingBudget: values.startingBudget,
+      maxPlayersPerTeam: values.maxPlayersPerTeam,
     };
-    const parsed = teamFormSchema.safeParse(payload);
-
-    if (!parsed.success) {
-      parsed.error.issues.forEach((issue) => {
-        const field = issue.path[0];
-        if (typeof field === "string" && field in defaultValues) {
-          setError(field as keyof TeamFormValues, {
-            message: issue.message,
-          });
-        }
-      });
-      return;
-    }
 
     try {
-      await createTeam(auctionId, payload);
+      await createAuction(payload);
       reset(defaultValues);
       await onSaved();
-    } catch (error) {
-      onError(error);
+    } catch {
+      onError();
     }
   }
 
@@ -300,77 +224,76 @@ function CreateTeamDialog({
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
-              Team Management
+              Auction Management
             </p>
-            <h3 className="mt-1 text-xl font-bold text-white">Create Team</h3>
+            <h3 className="mt-1 text-xl font-bold text-white">Create Auction</h3>
           </div>
           <Button
             type="button"
             variant="ghost"
             className="size-10 px-0"
             onClick={onClose}
-            aria-label="Close create team dialog"
+            aria-label="Close create auction dialog"
           >
             <X className="size-5" aria-hidden="true" />
           </Button>
         </div>
 
         <form className="grid gap-4 p-5" onSubmit={handleSubmit(onSubmit)}>
-          <Field label="Team Name" error={errors.name?.message} required>
+          <Field label="Auction Name" error={errors.name?.message} required>
             <input
               className={inputClasses}
-              placeholder="Team name"
+              placeholder="Tri Series Auction"
               {...register("name")}
             />
           </Field>
 
-          <Field label="Captain" error={errors.captainId?.message} required>
-            <select className={inputClasses} {...register("captainId")}>
-              <option value="">Select active player</option>
-              {activePlayers.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.name}
-                </option>
-              ))}
-            </select>
+          <Field label="Date" error={errors.date?.message}>
+            <input className={inputClasses} type="date" {...register("date")} />
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Team Color" error={errors.color?.message} required>
-              <div className="flex items-center gap-3">
-                <input
-                  className="size-11 rounded-md border border-white/10 bg-slate-900 p-1"
-                  type="color"
-                  {...register("color")}
-                />
-                <input className={inputClasses} {...register("color")} />
-              </div>
-            </Field>
-
-            <Field label="Budget">
+            <Field
+              label="Starting Budget"
+              error={errors.startingBudget?.message}
+            >
               <input
-                className={cn(inputClasses, "text-slate-400")}
-                readOnly
-                value={TEAM_BUDGET}
-                {...register("budgetTotal", { valueAsNumber: true })}
+                className={inputClasses}
+                min={1}
+                step={1}
+                type="number"
+                {...register("startingBudget", { valueAsNumber: true })}
               />
             </Field>
+            <Field
+              label="Max Players Per Team"
+              error={errors.maxPlayersPerTeam?.message}
+            >
+              <input
+                className={inputClasses}
+                min={1}
+                step={1}
+                type="number"
+                {...register("maxPlayersPerTeam", { valueAsNumber: true })}
+              />
+            </Field>
+          </div>
+
+          <div className="rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-400">
+            Status will be set to Draft.
           </div>
 
           <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || activePlayers.length === 0}
-            >
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               ) : (
                 <Plus className="size-4" aria-hidden="true" />
               )}
-              Create Team
+              Create Auction
             </Button>
           </div>
         </form>
@@ -438,6 +361,14 @@ function Toast({
       </div>
     </div>
   );
+}
+
+function formatDate(value: AuctionDocument["date"]) {
+  if (value && typeof value === "object" && "toDate" in value) {
+    return value.toDate().toLocaleDateString();
+  }
+
+  return "Date not set";
 }
 
 function formatPoints(points: number) {

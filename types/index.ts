@@ -1,5 +1,7 @@
 export type {
   AuctionDetailsDocument,
+  AuctionDocument,
+  AuctionDocumentStatus,
   AuctionPlayerDocument,
   AuctionStateDocument,
   AuctionStatus,
@@ -9,6 +11,7 @@ export type {
   BidDocument,
   CollectionDocumentMap,
   CreateAuctionDetailsInput,
+  CreateAuctionInput,
   CreateAuctionPlayerInput,
   CreateAuctionTeamInput,
   CreateBidInput,

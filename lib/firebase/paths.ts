@@ -1,7 +1,6 @@
 export const ROOT_COLLECTIONS = {
   users: "users",
   players: "players",
-  teams: "teams",
   settings: "settings",
   auctions: "auctions",
 } as const;

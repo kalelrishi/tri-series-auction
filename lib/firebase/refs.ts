@@ -16,9 +16,9 @@ import {
 } from "@/lib/firebase/paths";
 import type {
   AuctionDetailsDocument,
+  AuctionDocument,
   AuctionPlayerDocument,
   AuctionStateDocument,
-  AuctionTeamDocument,
   BidDocument,
   HistoryDocument,
   PlayerDocument,
@@ -75,12 +75,12 @@ export function playerDoc(playerId: string) {
   return typedDoc<PlayerDocument>(ROOT_COLLECTIONS.players, playerId);
 }
 
-export function teamsCollection() {
-  return typedCollection<TeamDocument>(ROOT_COLLECTIONS.teams);
+export function auctionsCollection() {
+  return typedCollection<AuctionDocument>(ROOT_COLLECTIONS.auctions);
 }
 
-export function teamDoc(teamId: string) {
-  return typedDoc<TeamDocument>(ROOT_COLLECTIONS.teams, teamId);
+export function auctionDoc(auctionId: string) {
+  return typedDoc<AuctionDocument>(ROOT_COLLECTIONS.auctions, auctionId);
 }
 
 export function settingsDoc() {
@@ -118,13 +118,13 @@ export function auctionPlayerDoc(auctionId: string, auctionPlayerId: string) {
 }
 
 export function auctionTeamsCollection(auctionId: string) {
-  return typedCollection<AuctionTeamDocument>(
+  return typedCollection<TeamDocument>(
     auctionSubcollectionPath(auctionId, AUCTION_COLLECTIONS.teams),
   );
 }
 
 export function auctionTeamDoc(auctionId: string, teamId: string) {
-  return typedDoc<AuctionTeamDocument>(
+  return typedDoc<TeamDocument>(
     auctionSubcollectionPath(auctionId, AUCTION_COLLECTIONS.teams),
     teamId,
   );

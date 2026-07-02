@@ -17,6 +17,13 @@ export const auctionStatusSchema = z.enum([
   "completed",
 ]);
 
+export const auctionDocumentStatusSchema = z.enum([
+  "Draft",
+  "Ready",
+  "Live",
+  "Completed",
+]);
+
 export const userSchema = z.object({
   name: z.string().trim().min(1),
   email: z.string().trim().email(),
@@ -65,6 +72,26 @@ export const createTeamSchema = z.object({
   budgetTotal: z.number().int().nonnegative(),
 });
 
+export const auctionSchema = z.object({
+  name: z.string().trim().min(1),
+  date: z.custom<FirestoreTimestamp>(),
+  status: auctionDocumentStatusSchema,
+  startingBudget: z.number().int().positive(),
+  maxPlayersPerTeam: z.number().int().positive(),
+  currentPlayerId: z.string().trim().min(1).nullable(),
+  currentTurnTeamId: z.string().trim().min(1).nullable(),
+  startedAt: z.custom<FirestoreTimestamp>().nullable(),
+  endedAt: z.custom<FirestoreTimestamp>().nullable(),
+  createdAt: z.custom<FirestoreTimestamp>(),
+});
+
+export const createAuctionSchema = z.object({
+  name: z.string().trim().min(1),
+  date: z.custom<FirestoreTimestamp>(),
+  startingBudget: z.number().int().positive(),
+  maxPlayersPerTeam: z.number().int().positive(),
+});
+
 export const settingsSchema = z.object({
   defaultBudget: z.number().int().positive(),
   defaultPlayersPerTeam: z.number().int().positive(),
@@ -96,13 +123,7 @@ export const auctionPlayerSchema = z.object({
   playerId: z.string().trim().min(1),
 });
 
-export const auctionTeamSchema = z.object({
-  name: z.string().trim().min(1),
-  captainId: z.string().trim().min(1),
-  budgetTotal: z.number().int().nonnegative(),
-  budgetRemaining: z.number().int().nonnegative(),
-  playerIds: z.array(z.string().trim().min(1)),
-});
+export const auctionTeamSchema = teamSchema;
 
 export const bidSchema = z.object({
   playerId: z.string().trim().min(1),

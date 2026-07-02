@@ -134,7 +134,11 @@ export async function createAuctionTeam(
   input: CreateAuctionTeamInput,
 ) {
   const data = validateInput(auctionTeamSchema, input);
-  return setDocument(auctionTeamDoc(auctionId, teamId), data);
+  return setDocument(auctionTeamDoc(auctionId, teamId), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function updateAuctionTeam(

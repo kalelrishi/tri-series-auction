@@ -7,6 +7,7 @@ export type UserRole = "admin" | "captain";
 export type PlayerRole = "Batter" | "Bowler" | "All-Rounder" | "Wicket Keeper";
 
 export type AuctionStatus = "draft" | "running" | "paused" | "completed";
+export type AuctionDocumentStatus = "Draft" | "Ready" | "Live" | "Completed";
 
 export type BaseDocument = {
   id: string;
@@ -59,6 +60,19 @@ export type TeamDocument = BaseDocument &
     playersCount: number;
   };
 
+export type AuctionDocument = BaseDocument & {
+  name: string;
+  date: FirestoreTimestamp;
+  status: AuctionDocumentStatus;
+  startingBudget: number;
+  maxPlayersPerTeam: number;
+  currentPlayerId: string | null;
+  currentTurnTeamId: string | null;
+  startedAt: FirestoreTimestamp | null;
+  endedAt: FirestoreTimestamp | null;
+  createdAt: FirestoreTimestamp;
+};
+
 export type SettingsDocument = BaseDocument & {
   defaultBudget: number;
   defaultPlayersPerTeam: number;
@@ -91,13 +105,7 @@ export type AuctionPlayerDocument = BaseDocument & {
   playerId: string;
 };
 
-export type AuctionTeamDocument = BaseDocument & {
-  name: string;
-  captainId: string;
-  budgetTotal: number;
-  budgetRemaining: number;
-  playerIds: string[];
-};
+export type AuctionTeamDocument = TeamDocument;
 
 export type BidDocument = BaseDocument & {
   playerId: string;
@@ -133,6 +141,13 @@ export type CreateTeamInput = {
   budgetTotal: number;
 };
 
+export type CreateAuctionInput = {
+  name: string;
+  date: FirestoreTimestamp;
+  startingBudget: number;
+  maxPlayersPerTeam: number;
+};
+
 export type UpsertSettingsInput = Omit<SettingsDocument, "id">;
 
 export type CreateAuctionDetailsInput = Omit<
@@ -155,6 +170,7 @@ export type CreateHistoryInput = Omit<HistoryDocument, "id" | "timestamp">;
 export type CollectionDocumentMap = {
   users: UserDocument;
   players: PlayerDocument;
+  auctions: AuctionDocument;
   teams: TeamDocument;
   settings: SettingsDocument;
   auctionDetails: AuctionDetailsDocument;
