@@ -1,16 +1,14 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Timestamp } from "firebase/firestore";
 import {
+  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Gavel,
   Loader2,
   Plus,
-  Trophy,
   X,
   XCircle,
 } from "lucide-react";
@@ -141,39 +139,47 @@ function AuctionsList({
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {auctions.map((auction) => (
-        <Link key={auction.id} href={`/auctions/${auction.id}`}>
-          <Card className="h-full p-5 transition hover:border-emerald-300/40 hover:bg-white/[0.075]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="truncate text-xl font-bold text-white">
-                  {auction.name}
-                </h3>
-                <p className="mt-2 flex items-center gap-2 text-sm text-slate-400">
-                  <CalendarDays className="size-4 text-emerald-200" aria-hidden="true" />
-                  {formatDate(auction.date)}
-                </p>
-              </div>
-              <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">
-                {auction.status}
-              </span>
+        <Card key={auction.id} className="h-full p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="truncate text-xl font-bold text-white">
+                {auction.name}
+              </h3>
+              <p className="mt-2 flex items-center gap-2 text-sm text-slate-400">
+                <CalendarDays className="size-4 text-emerald-200" aria-hidden="true" />
+                {formatDate(auction.date)}
+              </p>
             </div>
+            <span className="rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">
+              {auction.status}
+            </span>
+          </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-slate-400">Starting Budget</p>
-                <p className="mt-1 font-semibold text-white">
-                  {formatPoints(auction.startingBudget)}
-                </p>
-              </div>
-              <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-                <p className="text-slate-400">Max Players</p>
-                <p className="mt-1 font-semibold text-white">
-                  {auction.maxPlayersPerTeam}
-                </p>
-              </div>
+          <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+              <p className="text-slate-400">Starting Budget</p>
+              <p className="mt-1 font-semibold text-white">
+                {formatPoints(auction.startingBudget)}
+              </p>
             </div>
-          </Card>
-        </Link>
+            <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+              <p className="text-slate-400">Max Players</p>
+              <p className="mt-1 font-semibold text-white">
+                {auction.maxPlayersPerTeam}
+              </p>
+            </div>
+          </div>
+
+          <Button
+            asChild
+            href={`/auctions/${auction.id}`}
+            className="mt-5 w-full"
+            variant="secondary"
+          >
+            Manage
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Button>
+        </Card>
       ))}
     </section>
   );

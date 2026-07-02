@@ -12,13 +12,13 @@ import {
   XCircle,
 } from "lucide-react";
 import { teamSchema } from "@/lib/firebase/schema";
+import { listAuctions } from "@/services/auctions-service";
 import {
   createTeam,
   DuplicateTeamCaptainError,
   listAvailableTeamCaptains,
   listTeams,
 } from "@/services/teams-service";
-import { getOrCreateDefaultAuction } from "@/services/auctions-service";
 import type {
   AuctionDocument,
   CreateTeamInput,
@@ -66,7 +66,16 @@ export function TeamsClient() {
   async function loadData() {
     setLoading(true);
     try {
-      const activeAuction = await getOrCreateDefaultAuction();
+      const auctions = await listAuctions();
+      const activeAuction = auctions[0] ?? null;
+
+      if (!activeAuction) {
+        setAuction(null);
+        setTeams([]);
+        setPlayers([]);
+        return;
+      }
+
       const [nextTeams, nextPlayers] = await Promise.all([
         listTeams(activeAuction.id),
         listAvailableTeamCaptains(activeAuction.id),
@@ -108,16 +117,33 @@ export function TeamsClient() {
             {auction ? ` for ${auction.name}` : ""}
           </p>
         </div>
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          disabled={!auction}
+          onClick={() => setOpen(true)}
+        >
           <Plus className="size-4" aria-hidden="true" />
           Create Team
         </Button>
       </div>
 
-      <TeamsList
-        loading={loading}
-        teams={teams}
-      />
+      {!loading && !auction ? (
+        <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
+          <Shield className="size-10 text-slate-500" aria-hidden="true" />
+          <p className="mt-4 text-lg font-semibold text-white">
+            Create an auction first
+          </p>
+          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+            Teams now belong to an auction. Create or select an auction before
+            adding teams.
+          </p>
+          <Button asChild href="/auctions" className="mt-5">
+            Go to Auctions
+          </Button>
+        </Card>
+      ) : (
+        <TeamsList loading={loading} teams={teams} />
+      )}
 
       {open ? (
         <CreateTeamDialog
