@@ -1,6 +1,7 @@
 import { orderBy, serverTimestamp } from "firebase/firestore";
 import { auctionTeamsCollection, typedQuery } from "@/lib/firebase/refs";
 import { createTeamSchema, teamSchema } from "@/lib/firebase/schema";
+import { getAuction } from "@/services/auctions-service";
 import { listPlayers } from "@/services/players-service";
 import { addDocument, getCollection } from "@/services/firestore";
 import type { CreateTeamInput } from "@/types";
@@ -10,6 +11,13 @@ export class DuplicateTeamCaptainError extends Error {
   constructor() {
     super("This player is already captain of another team.");
     this.name = "DuplicateTeamCaptainError";
+  }
+}
+
+export class TeamManagementLockedError extends Error {
+  constructor() {
+    super("Team management is locked because this auction is already live or completed.");
+    this.name = "TeamManagementLockedError";
   }
 }
 
@@ -52,6 +60,7 @@ export async function createTeam(auctionId: string, input: CreateTeamInput) {
   }
 
   const data = inputValidation.data;
+  await assertTeamManagementOpen(auctionId);
   await assertCaptainAvailable(auctionId, data.captainId);
   const teamCandidate = {
     name: data.name,
@@ -92,6 +101,14 @@ export async function createTeam(auctionId: string, input: CreateTeamInput) {
   } catch (error) {
     console.error("[createTeam] Firestore write failed:", error);
     throw error;
+  }
+}
+
+async function assertTeamManagementOpen(auctionId: string) {
+  const auction = await getAuction(auctionId);
+
+  if (auction?.status === "Live" || auction?.status === "Completed") {
+    throw new TeamManagementLockedError();
   }
 }
 

@@ -5,6 +5,7 @@ import {
   playersCollection,
   typedQuery,
 } from "@/lib/firebase/refs";
+import { ROOT_COLLECTIONS } from "@/lib/firebase/paths";
 import { playerSchema } from "@/lib/firebase/schema";
 import {
   addDocument,
@@ -24,12 +25,25 @@ export async function listPlayers() {
 }
 
 export async function createPlayer(input: CreatePlayerInput) {
+  console.info("[createPlayer] payload before validation:", input);
+
+  const validation = playerSchema.safeParse(input);
+  console.info("[createPlayer] schema validation result:", validation);
+
   const data = validateInput(playerSchema, input);
-  return addDocument(playersCollection(), {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const collectionPath = ROOT_COLLECTIONS.players;
+  console.info("[createPlayer] Firestore write path:", collectionPath);
+
+  try {
+    return await addDocument(playersCollection(), {
+      ...data,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("[createPlayer] Firestore write failed:", error);
+    throw error;
+  }
 }
 
 export async function updatePlayer(

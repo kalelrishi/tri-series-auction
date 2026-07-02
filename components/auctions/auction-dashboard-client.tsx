@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { getAuctionDashboard } from "@/services/auction-dashboard-service";
+import { startAuction } from "@/services/auctions-service";
 import type { AuctionDocument, TeamDocument } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,9 +33,12 @@ type ReadinessItem = {
 };
 
 export function AuctionDashboardClient({ auctionId }: { auctionId: string }) {
+  const router = useRouter();
   const [state, setState] = useState<AuctionDashboardState>({
     status: "loading",
   });
+  const [startError, setStartError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -107,6 +112,21 @@ export function AuctionDashboardClient({ auctionId }: { auctionId: string }) {
       <ReadinessSection
         activePlayersCount={activePlayersCount}
         auction={auction}
+        onStart={async () => {
+          setStarting(true);
+          setStartError(null);
+
+          try {
+            await startAuction(auctionId);
+            router.push(`/auctions/${auctionId}/live`);
+          } catch (error) {
+            setStartError(getErrorMessage(error));
+          } finally {
+            setStarting(false);
+          }
+        }}
+        startError={startError}
+        starting={starting}
         teams={teams}
       />
     </DashboardFrame>
@@ -224,10 +244,16 @@ function TeamsSection({
 function ReadinessSection({
   activePlayersCount,
   auction,
+  onStart,
+  startError,
+  starting,
   teams,
 }: {
   activePlayersCount: number;
   auction: AuctionDocument | null;
+  onStart: () => Promise<void>;
+  startError: string | null;
+  starting: boolean;
   teams: TeamDocument[];
 }) {
   const readiness = useMemo(
@@ -235,7 +261,10 @@ function ReadinessSection({
     [activePlayersCount, auction, teams],
   );
   const allReady = readiness.every((item) => item.passed);
-  const disabledReason = readiness.find((item) => !item.passed)?.reason;
+  const statusBlockReason = getStartStatusBlockReason(auction);
+  const disabledReason =
+    statusBlockReason ?? readiness.find((item) => !item.passed)?.reason;
+  const canStart = allReady && !statusBlockReason;
 
   return (
     <Card className="p-6">
@@ -249,12 +278,19 @@ function ReadinessSection({
           </h3>
         </div>
         <div className="flex flex-col items-start gap-2 lg:items-end">
-          <Button type="button" disabled={!allReady}>
-            <Play className="size-4" aria-hidden="true" />
-            Start Auction
+          <Button type="button" disabled={!canStart || starting} onClick={onStart}>
+            {starting ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Play className="size-4" aria-hidden="true" />
+            )}
+            {starting ? "Starting..." : "Start Auction"}
           </Button>
-          {!allReady && disabledReason ? (
+          {!canStart && disabledReason ? (
             <p className="max-w-sm text-sm text-red-200">{disabledReason}</p>
+          ) : null}
+          {startError ? (
+            <p className="max-w-sm text-sm text-red-200">{startError}</p>
           ) : null}
         </div>
       </div>
@@ -321,6 +357,26 @@ function getReadinessItems(
   ];
 }
 
+function getStartStatusBlockReason(auction: AuctionDocument | null) {
+  if (!auction) {
+    return null;
+  }
+
+  if (auction.status === "Live") {
+    return "This auction is already live.";
+  }
+
+  if (auction.status === "Completed") {
+    return "Completed auctions cannot be started again.";
+  }
+
+  if (auction.status !== "Draft") {
+    return "Only draft auctions can be started.";
+  }
+
+  return null;
+}
+
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
@@ -340,4 +396,12 @@ function formatDate(value: AuctionDocument["date"]) {
 
 function formatPoints(points: number) {
   return new Intl.NumberFormat("en-IN").format(points);
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unable to start this auction right now.";
 }

@@ -12,13 +12,16 @@ import {
   XCircle,
 } from "lucide-react";
 import { teamSchema } from "@/lib/firebase/schema";
+import { getAuction } from "@/services/auctions-service";
 import {
   createTeam,
   DuplicateTeamCaptainError,
   listAvailableTeamCaptains,
   listTeams,
+  TeamManagementLockedError,
 } from "@/services/teams-service";
 import type {
+  AuctionDocument,
   CreateTeamInput,
   PlayerDocument,
   TeamDocument,
@@ -54,6 +57,7 @@ const defaultValues: TeamFormValues = {
 };
 
 export function TeamsClient({ auctionId }: { auctionId: string }) {
+  const [auction, setAuction] = useState<AuctionDocument | null>(null);
   const [teams, setTeams] = useState<TeamDocument[]>([]);
   const [players, setPlayers] = useState<PlayerDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,10 +67,12 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextTeams, nextPlayers] = await Promise.all([
+      const [nextAuction, nextTeams, nextPlayers] = await Promise.all([
+        getAuction(auctionId),
         listTeams(auctionId),
         listAvailableTeamCaptains(auctionId),
       ]);
+      setAuction(nextAuction);
       setTeams(nextTeams);
       setPlayers(nextPlayers);
     } catch {
@@ -87,6 +93,8 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
     () => players.filter((player) => player.active),
     [players],
   );
+  const teamManagementLocked =
+    auction?.status === "Live" || auction?.status === "Completed";
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -102,8 +110,14 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
             {teams.length} teams created for this auction
           </p>
         </div>
+        {teamManagementLocked ? (
+          <p className="rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-100">
+            Team management is locked while this auction is {auction.status}.
+          </p>
+        ) : null}
         <Button
           type="button"
+          disabled={teamManagementLocked}
           onClick={() => setOpen(true)}
         >
           <Plus className="size-4" aria-hidden="true" />
@@ -117,6 +131,7 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
         <CreateTeamDialog
           auctionId={auctionId}
           activePlayers={activePlayers}
+          locked={teamManagementLocked}
           onClose={() => setOpen(false)}
           onSaved={async () => {
             setOpen(false);
@@ -133,6 +148,8 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
               message:
                 error instanceof DuplicateTeamCaptainError
                   ? "This player is already captain of another team."
+                  : error instanceof TeamManagementLockedError
+                    ? error.message
                   : getErrorMessage(error),
             });
           }}
@@ -223,12 +240,14 @@ function TeamsList({
 function CreateTeamDialog({
   activePlayers,
   auctionId,
+  locked,
   onClose,
   onError,
   onSaved,
 }: {
   activePlayers: PlayerDocument[];
   auctionId?: string;
+  locked: boolean;
   onClose: () => void;
   onError: (error: unknown) => void;
   onSaved: () => Promise<void>;
@@ -242,6 +261,11 @@ function CreateTeamDialog({
   } = useForm<TeamFormValues>({ defaultValues });
 
   async function onSubmit(values: TeamFormValues) {
+    if (locked) {
+      onError(new TeamManagementLockedError());
+      return;
+    }
+
     const captain = activePlayers.find(
       (player) => player.id === values.captainId,
     );
@@ -362,7 +386,7 @@ function CreateTeamDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || activePlayers.length === 0}
+              disabled={locked || isSubmitting || activePlayers.length === 0}
             >
               {isSubmitting ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
