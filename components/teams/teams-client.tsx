@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   CheckCircle2,
@@ -12,7 +12,6 @@ import {
   XCircle,
 } from "lucide-react";
 import { teamSchema } from "@/lib/firebase/schema";
-import { listAuctions } from "@/services/auctions-service";
 import {
   createTeam,
   DuplicateTeamCaptainError,
@@ -20,7 +19,6 @@ import {
   listTeams,
 } from "@/services/teams-service";
 import type {
-  AuctionDocument,
   CreateTeamInput,
   PlayerDocument,
   TeamDocument,
@@ -55,32 +53,20 @@ const defaultValues: TeamFormValues = {
   budgetTotal: TEAM_BUDGET,
 };
 
-export function TeamsClient() {
-  const [auction, setAuction] = useState<AuctionDocument | null>(null);
+export function TeamsClient({ auctionId }: { auctionId: string }) {
   const [teams, setTeams] = useState<TeamDocument[]>([]);
   const [players, setPlayers] = useState<PlayerDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const auctions = await listAuctions();
-      const activeAuction = auctions[0] ?? null;
-
-      if (!activeAuction) {
-        setAuction(null);
-        setTeams([]);
-        setPlayers([]);
-        return;
-      }
-
       const [nextTeams, nextPlayers] = await Promise.all([
-        listTeams(activeAuction.id),
-        listAvailableTeamCaptains(activeAuction.id),
+        listTeams(auctionId),
+        listAvailableTeamCaptains(auctionId),
       ]);
-      setAuction(activeAuction);
       setTeams(nextTeams);
       setPlayers(nextPlayers);
     } catch {
@@ -91,11 +77,11 @@ export function TeamsClient() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [auctionId]);
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
 
   const activePlayers = useMemo(
     () => players.filter((player) => player.active),
@@ -113,13 +99,11 @@ export function TeamsClient() {
             Teams
           </h2>
           <p className="mt-2 text-sm text-slate-400">
-            {teams.length} teams created
-            {auction ? ` for ${auction.name}` : ""}
+            {teams.length} teams created for this auction
           </p>
         </div>
         <Button
           type="button"
-          disabled={!auction}
           onClick={() => setOpen(true)}
         >
           <Plus className="size-4" aria-hidden="true" />
@@ -127,27 +111,11 @@ export function TeamsClient() {
         </Button>
       </div>
 
-      {!loading && !auction ? (
-        <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
-          <Shield className="size-10 text-slate-500" aria-hidden="true" />
-          <p className="mt-4 text-lg font-semibold text-white">
-            Create an auction first
-          </p>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-            Teams now belong to an auction. Create or select an auction before
-            adding teams.
-          </p>
-          <Button asChild href="/auctions" className="mt-5">
-            Go to Auctions
-          </Button>
-        </Card>
-      ) : (
-        <TeamsList loading={loading} teams={teams} />
-      )}
+      <TeamsList loading={loading} teams={teams} />
 
       {open ? (
         <CreateTeamDialog
-          auctionId={auction?.id}
+          auctionId={auctionId}
           activePlayers={activePlayers}
           onClose={() => setOpen(false)}
           onSaved={async () => {
@@ -159,12 +127,13 @@ export function TeamsClient() {
             await loadData();
           }}
           onError={(error) => {
+            console.error("[CreateTeamDialog] exact createTeam error:", error);
             setToast({
               type: "error",
               message:
                 error instanceof DuplicateTeamCaptainError
                   ? "This player is already captain of another team."
-                  : "Unable to create team. Please check the form and try again.",
+                  : getErrorMessage(error),
             });
           }}
         />
@@ -297,9 +266,13 @@ function CreateTeamDialog({
       color: values.color,
       budgetTotal: TEAM_BUDGET,
     };
+    console.info("[CreateTeamDialog] auctionId:", auctionId);
+    console.info("[CreateTeamDialog] createTeam payload:", payload);
     const parsed = teamFormSchema.safeParse(payload);
+    console.info("[CreateTeamDialog] form validation:", parsed.success);
 
     if (!parsed.success) {
+      console.error("[CreateTeamDialog] form validation error:", parsed.error);
       parsed.error.issues.forEach((issue) => {
         const field = issue.path[0];
         if (typeof field === "string" && field in defaultValues) {
@@ -468,6 +441,14 @@ function Toast({
 
 function formatPoints(points: number) {
   return new Intl.NumberFormat("en-IN").format(points);
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unknown error while creating team.";
 }
 
 const inputClasses =

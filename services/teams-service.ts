@@ -5,7 +5,7 @@ import { listPlayers } from "@/services/players-service";
 import { addDocument, getCollection } from "@/services/firestore";
 import type { CreateTeamInput } from "@/types";
 import { validateInput } from "@/utils/validation";
-
+import { Timestamp } from "firebase/firestore";
 export class DuplicateTeamCaptainError extends Error {
   constructor() {
     super("This player is already captain of another team.");
@@ -39,9 +39,21 @@ export async function listAvailableTeamCaptains(
 }
 
 export async function createTeam(auctionId: string, input: CreateTeamInput) {
-  const data = validateInput(createTeamSchema, input);
+  console.info("[createTeam] auctionId:", auctionId);
+  console.info("[createTeam] Firestore path:", `auctions/${auctionId}/teams`);
+  console.info("[createTeam] input:", input);
+
+  const inputValidation = createTeamSchema.safeParse(input);
+  console.info("[createTeam] input validation:", inputValidation.success);
+
+  if (!inputValidation.success) {
+    console.error("[createTeam] input validation error:", inputValidation.error);
+    throw inputValidation.error;
+  }
+
+  const data = inputValidation.data;
   await assertCaptainAvailable(auctionId, data.captainId);
-  const team = validateInput(teamSchema, {
+  const teamCandidate = {
     name: data.name,
     captainId: data.captainId,
     captainName: data.captainName,
@@ -55,17 +67,32 @@ export async function createTeam(auctionId: string, input: CreateTeamInput) {
         role: data.captainRole,
         purchasePrice: 0,
         isCaptain: true,
-        joinedAt: serverTimestamp(),
+        joinedAt: Timestamp.now(),
+        
       },
     ],
     playersCount: 1,
-  });
+  };
+  const teamValidation = teamSchema.safeParse(teamCandidate);
+  console.info("[createTeam] team validation:", teamValidation.success);
 
-  return addDocument(auctionTeamsCollection(auctionId), {
-    ...team,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  if (!teamValidation.success) {
+    console.error("[createTeam] team validation error:", teamValidation.error);
+    throw teamValidation.error;
+  }
+
+  const team = validateInput(teamSchema, teamCandidate);
+
+  try {
+    return await addDocument(auctionTeamsCollection(auctionId), {
+      ...team,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("[createTeam] Firestore write failed:", error);
+    throw error;
+  }
 }
 
 async function assertCaptainAvailable(

@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, Play, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Loader2,
+  Play,
+  UsersRound,
+  XCircle,
+} from "lucide-react";
 import { getAuctionDashboard } from "@/services/auction-dashboard-service";
 import type { AuctionDocument, TeamDocument } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -90,6 +97,12 @@ export function AuctionDashboardClient({ auctionId }: { auctionId: string }) {
   return (
     <DashboardFrame>
       <AuctionOverview auction={auction} />
+      <div className="flex justify-end">
+        <Button asChild href={`/auctions/${auctionId}/teams`} variant="secondary">
+          <UsersRound className="size-4" aria-hidden="true" />
+          Manage Teams
+        </Button>
+      </div>
       <TeamsSection teams={teams} maxPlayers={auction?.maxPlayersPerTeam ?? 7} />
       <ReadinessSection
         activePlayersCount={activePlayersCount}

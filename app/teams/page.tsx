@@ -1,5 +1,5 @@
-import { TeamsClient } from "@/components/teams/teams-client";
+import { redirect } from "next/navigation";
 
 export default function TeamsPage() {
-  return <TeamsClient />;
+  redirect("/auctions");
 }
