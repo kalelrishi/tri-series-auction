@@ -8,6 +8,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Search,
   UserRound,
   X,
   XCircle,
@@ -44,6 +45,10 @@ type ToastState = {
   message: string;
 } | null;
 
+type RoleFilter = "All" | PlayerRole;
+type StatusFilter = "All" | "Active" | "Inactive";
+type SortOption = "name-asc" | "name-desc" | "price-asc" | "price-desc";
+
 const playerFormSchema = playerSchema.extend({
   basePrice: z.coerce.number().int().nonnegative(),
 });
@@ -61,6 +66,14 @@ const defaultValues: PlayerFormValues = {
 };
 
 const roles = playerRoleSchema.options;
+const roleFilterOptions: RoleFilter[] = ["All", ...roles];
+const statusFilterOptions: StatusFilter[] = ["All", "Active", "Inactive"];
+const sortOptions: { label: string; value: SortOption }[] = [
+  { label: "Name (A-Z)", value: "name-asc" },
+  { label: "Name (Z-A)", value: "name-desc" },
+  { label: "Base Price (Low-High)", value: "price-asc" },
+  { label: "Base Price (High-Low)", value: "price-desc" },
+];
 
 export function PlayersClient() {
   const [players, setPlayers] = useState<PlayerDocument[]>([]);
@@ -71,6 +84,10 @@ export function PlayersClient() {
   );
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [sortOption, setSortOption] = useState<SortOption>("name-asc");
 
   async function loadPlayers() {
     setLoading(true);
@@ -94,6 +111,40 @@ export function PlayersClient() {
     () => players.filter((player) => player.active).length,
     [players],
   );
+  const inactiveCount = players.length - activeCount;
+  const visiblePlayers = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return players
+      .filter((player) => {
+        const matchesSearch =
+          normalizedSearch.length === 0 ||
+          player.name.toLowerCase().includes(normalizedSearch) ||
+          (player.nickname ?? "").toLowerCase().includes(normalizedSearch);
+        const matchesRole =
+          roleFilter === "All" || player.role === roleFilter;
+        const matchesStatus =
+          statusFilter === "All" ||
+          (statusFilter === "Active" ? player.active : !player.active);
+
+        return matchesSearch && matchesRole && matchesStatus;
+      })
+      .toSorted((first, second) => {
+        if (sortOption === "name-asc") {
+          return first.name.localeCompare(second.name);
+        }
+
+        if (sortOption === "name-desc") {
+          return second.name.localeCompare(first.name);
+        }
+
+        if (sortOption === "price-asc") {
+          return first.basePrice - second.basePrice;
+        }
+
+        return second.basePrice - first.basePrice;
+      });
+  }, [players, roleFilter, searchTerm, sortOption, statusFilter]);
 
   async function togglePlayerStatus(player: PlayerDocument) {
     setUpdatingStatusId(player.id);
@@ -125,7 +176,7 @@ export function PlayersClient() {
             Players
           </h2>
           <p className="mt-2 text-sm text-slate-400">
-            {players.length} total, {activeCount} active
+            {visiblePlayers.length} showing from {players.length} total
           </p>
         </div>
         <Button
@@ -140,9 +191,27 @@ export function PlayersClient() {
         </Button>
       </div>
 
+      <PlayerSummaryCards
+        total={players.length}
+        active={activeCount}
+        inactive={inactiveCount}
+      />
+
+      <PlayerFilters
+        searchTerm={searchTerm}
+        roleFilter={roleFilter}
+        statusFilter={statusFilter}
+        sortOption={sortOption}
+        onSearchChange={setSearchTerm}
+        onRoleChange={setRoleFilter}
+        onStatusChange={setStatusFilter}
+        onSortChange={setSortOption}
+      />
+
       <PlayersList
-        players={players}
+        players={visiblePlayers}
         loading={loading}
+        totalPlayers={players.length}
         onEdit={(player) => {
           setEditingPlayer(player);
           setOpen(true);
@@ -185,17 +254,160 @@ export function PlayersClient() {
   );
 }
 
+function PlayerSummaryCards({
+  active,
+  inactive,
+  total,
+}: {
+  active: number;
+  inactive: number;
+  total: number;
+}) {
+  return (
+    <section className="grid gap-3 sm:grid-cols-3">
+      <SummaryCard label="Total Players" value={total} />
+      <SummaryCard label="Active Players" value={active} tone="active" />
+      <SummaryCard label="Inactive Players" value={inactive} tone="inactive" />
+    </section>
+  );
+}
+
+function SummaryCard({
+  label,
+  tone = "default",
+  value,
+}: {
+  label: string;
+  tone?: "default" | "active" | "inactive";
+  value: number;
+}) {
+  return (
+    <Card className="p-4">
+      <p className="text-sm text-slate-400">{label}</p>
+      <p
+        className={cn(
+          "mt-2 text-3xl font-black text-white",
+          tone === "active" && "text-emerald-200",
+          tone === "inactive" && "text-slate-300",
+        )}
+      >
+        {value}
+      </p>
+    </Card>
+  );
+}
+
+function PlayerFilters({
+  onRoleChange,
+  onSearchChange,
+  onSortChange,
+  onStatusChange,
+  roleFilter,
+  searchTerm,
+  sortOption,
+  statusFilter,
+}: {
+  onRoleChange: (value: RoleFilter) => void;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: SortOption) => void;
+  onStatusChange: (value: StatusFilter) => void;
+  roleFilter: RoleFilter;
+  searchTerm: string;
+  sortOption: SortOption;
+  statusFilter: StatusFilter;
+}) {
+  return (
+    <Card className="p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_180px_230px]">
+        <label className="grid gap-2">
+          <span className="text-sm font-semibold text-slate-200">Search</span>
+          <span className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+              aria-hidden="true"
+            />
+            <input
+              className={cn(inputClasses, "w-full pl-9")}
+              placeholder="Search by name or nickname"
+              value={searchTerm}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+          </span>
+        </label>
+
+        <FilterSelect
+          label="Role"
+          value={roleFilter}
+          onChange={(value) => onRoleChange(value as RoleFilter)}
+          options={roleFilterOptions.map((role) => ({
+            label: role,
+            value: role,
+          }))}
+        />
+
+        <FilterSelect
+          label="Status"
+          value={statusFilter}
+          onChange={(value) => onStatusChange(value as StatusFilter)}
+          options={statusFilterOptions.map((status) => ({
+            label: status,
+            value: status,
+          }))}
+        />
+
+        <FilterSelect
+          label="Sort"
+          value={sortOption}
+          onChange={(value) => onSortChange(value as SortOption)}
+          options={sortOptions}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function FilterSelect({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: { label: string; value: string }[];
+  value: string;
+}) {
+  return (
+    <label className="grid gap-2">
+      <span className="text-sm font-semibold text-slate-200">{label}</span>
+      <select
+        className={cn(inputClasses, "w-full")}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function PlayersList({
   players,
   loading,
   onEdit,
   onToggleStatus,
+  totalPlayers,
   updatingStatusId,
 }: {
   players: PlayerDocument[];
   loading: boolean;
   onEdit: (player: PlayerDocument) => void;
   onToggleStatus: (player: PlayerDocument) => void;
+  totalPlayers: number;
   updatingStatusId: string | null;
 }) {
   if (loading) {
@@ -211,9 +423,13 @@ function PlayersList({
     return (
       <Card className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
         <UserRound className="size-10 text-slate-500" aria-hidden="true" />
-        <p className="mt-4 text-lg font-semibold text-white">No players yet</p>
+        <p className="mt-4 text-lg font-semibold text-white">
+          {totalPlayers === 0 ? "No players yet" : "No matching players"}
+        </p>
         <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
-          Add the first permanent player to start building the player pool.
+          {totalPlayers === 0
+            ? "Add the first permanent player to start building the player pool."
+            : "Adjust the search or filters to see more players."}
         </p>
       </Card>
     );
