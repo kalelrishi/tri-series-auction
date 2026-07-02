@@ -6,14 +6,23 @@ import { z } from "zod";
 import {
   CheckCircle2,
   Loader2,
+  Pencil,
   Plus,
   UserRound,
   X,
   XCircle,
 } from "lucide-react";
 import { playerRoleSchema, playerSchema } from "@/lib/firebase/schema";
-import { createPlayer, listPlayers } from "@/services/players-service";
-import type { CreatePlayerInput, PlayerDocument, PlayerRole } from "@/types";
+import {
+  createPlayer,
+  listPlayers,
+  updatePlayer,
+} from "@/services/players-service";
+import type {
+  CreatePlayerInput,
+  PlayerDocument,
+  PlayerRole,
+} from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -58,6 +67,9 @@ export function PlayersClient() {
   const [players, setPlayers] = useState<PlayerDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<PlayerDocument | null>(
+    null,
+  );
   const [toast, setToast] = useState<ToastState>(null);
 
   async function loadPlayers() {
@@ -97,29 +109,49 @@ export function PlayersClient() {
             {players.length} total, {activeCount} active
           </p>
         </div>
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          onClick={() => {
+            setEditingPlayer(null);
+            setOpen(true);
+          }}
+        >
           <Plus className="size-4" aria-hidden="true" />
           Add Player
         </Button>
       </div>
 
-      <PlayersList players={players} loading={loading} />
+      <PlayersList
+        players={players}
+        loading={loading}
+        onEdit={(player) => {
+          setEditingPlayer(player);
+          setOpen(true);
+        }}
+      />
 
       {open ? (
-        <AddPlayerDialog
-          onClose={() => setOpen(false)}
+        <PlayerDialog
+          player={editingPlayer}
+          onClose={() => {
+            setOpen(false);
+            setEditingPlayer(null);
+          }}
           onSaved={async () => {
             setOpen(false);
+            const action = editingPlayer ? "updated" : "added";
+            setEditingPlayer(null);
             setToast({
               type: "success",
-              message: "Player added successfully.",
+              message: `Player ${action} successfully.`,
             });
             await loadPlayers();
           }}
           onError={() => {
             setToast({
               type: "error",
-              message: "Unable to add player. Please check the form and try again.",
+              message:
+                "Unable to save player. Please check the form and try again.",
             });
           }}
         />
@@ -133,9 +165,11 @@ export function PlayersClient() {
 function PlayersList({
   players,
   loading,
+  onEdit,
 }: {
   players: PlayerDocument[];
   loading: boolean;
+  onEdit: (player: PlayerDocument) => void;
 }) {
   if (loading) {
     return (
@@ -169,6 +203,7 @@ function PlayersList({
               <th className="px-5 py-4 font-semibold">Role</th>
               <th className="px-5 py-4 font-semibold">Base Price</th>
               <th className="px-5 py-4 font-semibold">Status</th>
+              <th className="px-5 py-4 text-right font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10">
@@ -184,6 +219,17 @@ function PlayersList({
                 <td className="px-5 py-4">{formatPoints(player.basePrice)}</td>
                 <td className="px-5 py-4">
                   <StatusBadge active={player.active} />
+                </td>
+                <td className="px-5 py-4 text-right">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="min-h-9 px-3"
+                    onClick={() => onEdit(player)}
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Edit
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -217,6 +263,15 @@ function PlayersList({
                 </p>
               </div>
             </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-4 w-full"
+              onClick={() => onEdit(player)}
+            >
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit
+            </Button>
           </Card>
         ))}
       </div>
@@ -224,22 +279,27 @@ function PlayersList({
   );
 }
 
-function AddPlayerDialog({
+function PlayerDialog({
+  player,
   onClose,
   onSaved,
   onError,
 }: {
+  player: PlayerDocument | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
   onError: () => void;
 }) {
+  const mode = player ? "edit" : "add";
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
     register,
     reset,
     setError,
-  } = useForm<PlayerFormValues>({ defaultValues });
+  } = useForm<PlayerFormValues>({
+    defaultValues: player ? getPlayerFormValues(player) : defaultValues,
+  });
 
   async function onSubmit(values: PlayerFormValues) {
     const parsed = playerFormSchema.safeParse(values);
@@ -257,7 +317,12 @@ function AddPlayerDialog({
     }
 
     try {
-      await createPlayer(cleanPlayerInput(parsed.data));
+      const data = cleanPlayerInput(parsed.data);
+      if (player) {
+        await updatePlayer(player.id, data);
+      } else {
+        await createPlayer(data);
+      }
       reset(defaultValues);
       await onSaved();
     } catch {
@@ -273,7 +338,9 @@ function AddPlayerDialog({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
               Player Pool
             </p>
-            <h3 className="mt-1 text-xl font-bold text-white">Add Player</h3>
+            <h3 className="mt-1 text-xl font-bold text-white">
+              {mode === "edit" ? "Edit Player" : "Add Player"}
+            </h3>
           </div>
           <Button
             type="button"
@@ -374,7 +441,7 @@ function AddPlayerDialog({
               ) : (
                 <Plus className="size-4" aria-hidden="true" />
               )}
-              Save
+              {mode === "edit" ? "Save Changes" : "Save"}
             </Button>
           </div>
         </form>
@@ -469,6 +536,20 @@ function cleanPlayerInput(values: z.infer<typeof playerFormSchema>): CreatePlaye
     phone: emptyToUndefined(values.phone),
     photoUrl: values.photoUrl,
     active: values.active,
+  };
+}
+
+function getPlayerFormValues(player: PlayerDocument): PlayerFormValues {
+  return {
+    name: player.name,
+    nickname: player.nickname ?? "",
+    role: player.role,
+    battingStyle: player.battingStyle ?? "",
+    bowlingStyle: player.bowlingStyle ?? "",
+    basePrice: player.basePrice,
+    phone: player.phone ?? "",
+    photoUrl: player.photoUrl ?? "",
+    active: player.active,
   };
 }
 
