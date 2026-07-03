@@ -47,6 +47,7 @@ export const teamSchema = z.object({
   name: z.string().trim().min(1),
   captainId: z.string().trim().min(1),
   captainName: z.string().trim().min(1),
+  captainAccessCode: z.string().trim().min(1),
   color: z.string().trim().min(1),
   budgetTotal: z.number().int().nonnegative(),
   budgetRemaining: z.number().int().nonnegative(),
@@ -135,9 +136,13 @@ export const bidSchema = z.object({
 });
 
 export const historySchema = z.object({
+  auctionId: z.string().trim().min(1),
   playerId: z.string().trim().min(1),
   playerName: z.string().trim().min(1),
-  teamId: z.string().trim().min(1),
-  teamName: z.string().trim().min(1),
-  soldPrice: z.number().int().nonnegative(),
+  playerRole: playerRoleSchema,
+  status: z.enum(["Sold", "Unsold"]),
+  winningTeamId: z.string().trim().min(1).nullable(),
+  winningTeamName: z.string().trim().min(1).nullable(),
+  finalPrice: z.number().int().nonnegative().nullable(),
+  round: z.number().int().positive(),
 });

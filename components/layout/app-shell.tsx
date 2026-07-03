@@ -1,9 +1,21 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Menu, Radio, ShieldCheck } from "lucide-react";
+import {
+  CalendarDays,
+  History,
+  LogOut,
+  Menu,
+  Radio,
+  Settings,
+  Shield,
+  ShieldCheck,
+  Trophy,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
@@ -11,9 +23,9 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import { navigationItems } from "@/components/layout/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import { getActiveLiveAuction } from "@/services/auctions-service";
 import { cn } from "@/utils/cn";
 
@@ -29,16 +41,18 @@ type NavigationItem = {
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const {
+    captainSession,
+    loading,
+    logoutAdmin,
+    logoutCaptain,
+    role,
+  } = useAuth();
   const [liveAuctionHref, setLiveAuctionHref] = useState<string | null>(null);
   const allNavigationItems = useMemo<NavigationItem[]>(
-    () =>
-      liveAuctionHref
-        ? [
-            ...navigationItems,
-            { label: "Live Auction", href: liveAuctionHref, icon: Radio },
-          ]
-        : [...navigationItems],
-    [liveAuctionHref],
+    () => getNavigationItems(role, liveAuctionHref, captainSession?.auctionId),
+    [captainSession?.auctionId, liveAuctionHref, role],
   );
   const currentPage =
     allNavigationItems.find((item) => item.href === pathname)?.label ??
@@ -82,12 +96,48 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, [pathname]);
 
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    const destination = getRedirectDestination(
+      pathname,
+      role,
+      captainSession?.auctionId,
+    );
+
+    if (destination && destination !== pathname) {
+      router.replace(destination);
+    }
+  }, [captainSession?.auctionId, loading, pathname, role, router]);
+
+  async function handleLogout() {
+    if (role === "admin") {
+      await logoutAdmin();
+      router.replace("/login");
+      return;
+    }
+
+    if (role === "captain") {
+      logoutCaptain();
+      router.replace("/captain/login");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.18),transparent_34%),linear-gradient(135deg,#020617_0%,#0f172a_45%,#111827_100%)]" />
       <div className="flex min-h-screen">
         <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-slate-950/80 px-4 py-5 backdrop-blur lg:block">
-          <SidebarContent items={allNavigationItems} pathname={pathname} />
+          <SidebarContent
+            items={allNavigationItems}
+            onLogout={() => {
+              void handleLogout();
+            }}
+            pathname={pathname}
+            role={role}
+          />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -142,6 +192,18 @@ export function AppShell({ children }: AppShellProps) {
                   </Link>
                 );
               })}
+              {role !== "guest" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                  className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/8 hover:text-white"
+                >
+                  <LogOut className="size-4" aria-hidden={true} />
+                  Logout
+                </button>
+              ) : null}
             </div>
           </nav>
 
@@ -154,10 +216,14 @@ export function AppShell({ children }: AppShellProps) {
 
 function SidebarContent({
   items,
+  onLogout,
   pathname,
+  role,
 }: {
   items: NavigationItem[];
+  onLogout: () => void;
   pathname: string;
+  role: "admin" | "captain" | "guest";
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -200,6 +266,16 @@ function SidebarContent({
             </Link>
           );
         })}
+        {role !== "guest" ? (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="relative flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm font-semibold text-slate-300 transition hover:bg-white/8 hover:text-white"
+          >
+            <LogOut className="relative size-5" aria-hidden={true} />
+            <span className="relative">Logout</span>
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-auto rounded-lg border border-white/10 bg-white/[0.055] p-4">
@@ -210,6 +286,103 @@ function SidebarContent({
       </div>
     </div>
   );
+}
+
+function getNavigationItems(
+  role: "admin" | "captain" | "guest",
+  liveAuctionHref: string | null,
+  captainAuctionId?: string,
+): NavigationItem[] {
+  if (role === "admin") {
+    const items: NavigationItem[] = [
+      { label: "Dashboard", href: "/admin", icon: Shield },
+      { label: "Players", href: "/players", icon: UserRound },
+      { label: "Auctions", href: "/auctions", icon: CalendarDays },
+      { label: "Teams", href: "/teams", icon: UsersRound },
+    ];
+
+    if (liveAuctionHref) {
+      items.push({ label: "Live Auction", href: liveAuctionHref, icon: Radio });
+    }
+
+    return [
+      ...items,
+      { label: "History", href: "/history", icon: History },
+      { label: "Settings", href: "/settings", icon: Settings },
+    ];
+  }
+
+  if (role === "captain") {
+    const items: NavigationItem[] = [
+      { label: "My Team", href: "/captain", icon: Trophy },
+    ];
+
+    if (captainAuctionId) {
+      items.push({
+        label: "Live Auction",
+        href: `/auctions/${captainAuctionId}/live`,
+        icon: Radio,
+      });
+    }
+
+    return items;
+  }
+
+  return [
+    { label: "Admin Login", href: "/login", icon: Shield },
+    { label: "Captain Login", href: "/captain/login", icon: Trophy },
+  ];
+}
+
+function getRedirectDestination(
+  pathname: string,
+  role: "admin" | "captain" | "guest",
+  captainAuctionId?: string,
+) {
+  const isAdminLogin = pathname === "/login";
+  const isCaptainLogin = pathname === "/captain/login";
+  const isCaptainDashboard = pathname === "/captain";
+  const isCaptainRoute = pathname.startsWith("/captain");
+  const isLiveAuctionRoute = /^\/auctions\/[^/]+\/live$/.test(pathname);
+  const isGuestOnly = isAdminLogin || isCaptainLogin;
+
+  if (role === "guest") {
+    if (isGuestOnly) {
+      return null;
+    }
+
+    return isCaptainRoute ? "/captain/login" : "/login";
+  }
+
+  if (role === "admin") {
+    if (isGuestOnly || pathname === "/" || isCaptainRoute) {
+      return "/admin";
+    }
+
+    return null;
+  }
+
+  if (role === "captain") {
+    if (isGuestOnly || pathname === "/") {
+      return "/captain";
+    }
+
+    if (isCaptainDashboard) {
+      return null;
+    }
+
+    if (
+      isLiveAuctionRoute &&
+      captainAuctionId &&
+      pathname === `/auctions/${captainAuctionId}/live`
+    ) {
+      return null;
+    }
+
+    return "/captain";
+  }
+
+  return null;
 }
 
 function GavelIcon() {

@@ -53,6 +53,7 @@ export type TeamDocument = BaseDocument &
     name: string;
     captainId: string;
     captainName: string;
+    captainAccessCode: string;
     color: string;
     budgetTotal: number;
     budgetRemaining: number;
@@ -118,11 +119,15 @@ export type BidDocument = BaseDocument & {
 };
 
 export type HistoryDocument = BaseDocument & {
+  auctionId: string;
   playerId: string;
   playerName: string;
-  teamId: string;
-  teamName: string;
-  soldPrice: number;
+  playerRole: PlayerRole;
+  status: "Sold" | "Unsold";
+  winningTeamId: string | null;
+  winningTeamName: string | null;
+  finalPrice: number | null;
+  round: number;
   timestamp: FirestoreTimestamp;
 };
 

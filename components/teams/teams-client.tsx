@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   CheckCircle2,
+  Copy,
   Loader2,
   MoreVertical,
   Pencil,
@@ -80,6 +81,18 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
   const [deletingTeam, setDeletingTeam] = useState<TeamDocument | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
+  async function copyAccessCode(team: TeamDocument) {
+    if (!team.captainAccessCode) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(team.captainAccessCode);
+    setToast({
+      type: "success",
+      message: "Access code copied.",
+    });
+  }
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -145,6 +158,9 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
         loading={loading}
         onDelete={setDeletingTeam}
         onEdit={setEditingTeam}
+        onCopyAccessCode={(team) => {
+          void copyAccessCode(team);
+        }}
         teams={teams}
       />
 
@@ -238,12 +254,14 @@ function TeamsList({
   loading,
   onDelete,
   onEdit,
+  onCopyAccessCode,
   teams,
 }: {
   locked: boolean;
   loading: boolean;
   onDelete: (team: TeamDocument) => void;
   onEdit: (team: TeamDocument) => void;
+  onCopyAccessCode: (team: TeamDocument) => void;
   teams: TeamDocument[];
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -349,6 +367,57 @@ function TeamsList({
                 <p className="mt-1 font-semibold text-white">
                   {team.playersCount ?? team.players?.length ?? 0} / 7
                 </p>
+              </div>
+              <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+                <p className="text-slate-400">Spent Budget</p>
+                <p className="mt-1 font-semibold text-white">
+                  {formatPoints(team.budgetTotal - team.budgetRemaining)}
+                </p>
+              </div>
+              <div className="rounded-md border border-white/10 bg-white/[0.04] p-3">
+                <p className="text-slate-400">Captain</p>
+                <p className="mt-1 truncate font-semibold text-white">
+                  {team.captainName}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-3">
+              <p className="text-sm text-slate-400">Access Code</p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <code className="min-w-0 truncate text-sm font-bold text-emerald-100">
+                  {team.captainAccessCode ?? "Not generated"}
+                </code>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-8 px-2"
+                  disabled={!team.captainAccessCode}
+                  onClick={() => onCopyAccessCode(team)}
+                >
+                  <Copy className="size-4" aria-hidden="true" />
+                  Copy
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] p-3">
+              <p className="text-sm text-slate-400">Purchased Players</p>
+              <div className="mt-3 grid gap-2">
+                {(team.players ?? []).map((player) => (
+                  <div
+                    key={player.playerId}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span className="min-w-0 truncate text-slate-200">
+                      {player.playerName}
+                      {player.isCaptain ? " (Captain)" : ""}
+                    </span>
+                    <span className="shrink-0 text-slate-400">
+                      {formatPoints(player.purchasePrice)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
