@@ -1,36 +1,334 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏏 Tri Series Auction
 
-## Getting Started
+> **A real-time cricket auction platform built with Next.js, Firebase, and TypeScript.**
+>
+> Manage players, teams, auctions, and live bidding with separate Admin and Captain experiences.
 
-First, run the development server:
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
+![Firebase](https://img.shields.io/badge/Firebase-Firestore-orange)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38BDF8)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+---
+
+## 📖 Overview
+
+Tri Series Auction is a complete **real-time cricket auction management system** designed for local tournaments, college events, and cricket leagues.
+
+The application allows an **Admin (Auctioneer)** to manage players, teams, and auctions while multiple **Captains** participate simultaneously using secure access codes.
+
+The entire auction updates in real time using **Firebase Firestore**, ensuring every participant sees live bidding, player nominations, and auction results instantly.
+
+---
+
+## ✨ Features
+
+### 👑 Admin
+
+- Secure Firebase Authentication
+- Player Management
+- Team Management
+- Auction Management
+- Live Auction Dashboard
+- Player Nomination
+- Start / Continue Auction
+- Sold / Unsold Actions
+- Auction Reset (Development)
+- Auction History
+- Reports
+
+---
+
+### 🏏 Captain
+
+- Secure Access Code Login
+- Team Dashboard
+- Live Auction View
+- Real-time Bidding
+- Budget Tracking
+- Read-only Team Information
+
+---
+
+### ⚡ Live Auction
+
+- Real-time Firestore Synchronization
+- Automatic Player Nomination
+- Fixed Bid Increment
+- Budget Validation
+- Highest Bidder Tracking
+- Sold & Unsold Flow
+- Automatic Next Player
+- Auction Completion
+- Live Bid Activity
+
+---
+
+### 📊 Reports
+
+- Sold Players
+- Unsold Players
+- Team Squads
+- Remaining Budget
+- Spending Summary
+- Auction History
+
+---
+
+## 🛠 Tech Stack
+
+### Frontend
+
+- Next.js 15
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+
+### Backend
+
+- Firebase Firestore
+- Firebase Authentication
+
+### State Management
+
+- React Hooks
+- Firebase Realtime Listeners
+
+### Validation
+
+- Zod
+
+---
+
+# 🏗 Architecture
+
+```
+                    Firebase
+
+        ┌──────────────────────────┐
+        │ Authentication           │
+        │ Firestore Database       │
+        └─────────────┬────────────┘
+                      │
+              Real-time Updates
+                      │
+        ┌─────────────▼────────────┐
+        │      Next.js App         │
+        └─────────────┬────────────┘
+                      │
+      ┌───────────────┴────────────────┐
+      │                                │
+┌─────▼─────┐                    ┌─────▼─────┐
+│   Admin   │                    │ Captain   │
+└───────────┘                    └───────────┘
+```
+
+---
+
+# 📂 Project Structure
+
+```
+app/
+components/
+services/
+lib/
+types/
+utils/
+public/
+```
+
+The project follows a **service-layer architecture**.
+
+All Firestore operations are isolated inside the `services/` directory.
+
+---
+
+# 🔐 Authentication
+
+## Admin
+
+Uses **Firebase Authentication**.
+
+Permissions:
+
+- Full access
+- Player Management
+- Team Management
+- Auctions
+- Live Auction Controls
+- Reports
+
+---
+
+## Captain
+
+Uses automatically generated **Access Codes**.
+
+Example:
+
+```
+TSA-9X4K2P
+```
+
+Captains can:
+
+- Login
+- View their Team
+- Participate in Live Auction
+- Place Bids
+
+---
+
+# 🔥 Auction Flow
+
+```
+Create Players
+        │
+        ▼
+Create Auction
+        │
+        ▼
+Create Teams
+        │
+        ▼
+Start Auction
+        │
+        ▼
+Nominate Player
+        │
+        ▼
+Live Bidding
+        │
+        ▼
+Sold / Unsold
+        │
+        ▼
+Next Player
+        │
+        ▼
+Auction Complete
+        │
+        ▼
+Reports & History
+```
+
+---
+
+# 🚀 Installation
+
+Clone the repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/tri-series-auction.git
+```
+
+Go into the project
+
+```bash
+cd tri-series-auction
+```
+
+Install dependencies
+
+```bash
+npm install
+```
+
+Create your environment file
+
+```bash
+cp .env.example .env.local
+```
+
+Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# 🔑 Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file.
 
-## Learn More
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=
 
-To learn more about Next.js, take a look at the following resources:
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 
-## Deploy on Vercel
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+NEXT_PUBLIC_FIREBASE_APP_ID=
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+# 🧪 Available Scripts
+
+```bash
+npm run dev
+npm run build
+npm run lint
+```
+
+---
+
+# 📸 Screenshots
+
+Add screenshots here after completing the UI redesign.
+
+Suggested screenshots:
+
+- Login
+- Dashboard
+- Player Management
+- Team Management
+- Auction Dashboard
+- Live Auction
+- Captain Dashboard
+- History
+
+---
+
+# 🎯 Future Improvements
+
+- Mobile Application
+- Auction Timer
+- Voice Announcements
+- Player Images
+- Statistics Dashboard
+- Dark / Light Theme
+- Export PDF Reports
+- Keyboard Shortcuts
+- Push Notifications
+
+---
+
+# 👨‍💻 Author
+
+**Hrushikesh Eluru**
+
+Cyber Security Engineering Student
+
+Built with ❤️ using Next.js, Firebase, and TypeScript.
+
+---
+
+# 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## ⭐ If you like this project
+
+Give the repository a ⭐ on GitHub.
+
+It helps a lot!
