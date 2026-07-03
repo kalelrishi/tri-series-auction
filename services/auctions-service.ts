@@ -27,6 +27,11 @@ export async function listAuctions() {
   );
 }
 
+export async function getActiveLiveAuction() {
+  const auctions = await listAuctions();
+  return auctions.find((auction) => auction.status === "Live") ?? null;
+}
+
 export async function getAuction(auctionId: string) {
   return getDocument(auctionDoc(auctionId));
 }
@@ -71,5 +76,16 @@ export async function startAuction(auctionId: string) {
   return mergeDocument(auctionDoc(auctionId), {
     status: "Live",
     startedAt: serverTimestamp(),
+  });
+}
+
+export async function resetAuctionToDraft(auctionId: string) {
+  return mergeDocument(auctionDoc(auctionId), {
+    status: "Draft",
+    currentPlayerId: null,
+    currentBid: null,
+    leadingTeamId: null,
+    leadingTeamName: null,
+    startedAt: null,
   });
 }

@@ -1,12 +1,26 @@
-import { orderBy, serverTimestamp } from "firebase/firestore";
-import { auctionTeamsCollection, typedQuery } from "@/lib/firebase/refs";
+import { orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
+import {
+  auctionTeamDoc,
+  auctionTeamsCollection,
+  typedQuery,
+} from "@/lib/firebase/refs";
 import { createTeamSchema, teamSchema } from "@/lib/firebase/schema";
 import { getAuction } from "@/services/auctions-service";
 import { listPlayers } from "@/services/players-service";
-import { addDocument, getCollection } from "@/services/firestore";
+import {
+  addDocument,
+  getCollection,
+  mergeDocument,
+  removeDocument,
+} from "@/services/firestore";
 import type { CreateTeamInput } from "@/types";
 import { validateInput } from "@/utils/validation";
-import { Timestamp } from "firebase/firestore";
+
+type UpdateTeamInput = {
+  name: string;
+  color: string;
+};
+
 export class DuplicateTeamCaptainError extends Error {
   constructor() {
     super("This player is already captain of another team.");
@@ -16,7 +30,7 @@ export class DuplicateTeamCaptainError extends Error {
 
 export class TeamManagementLockedError extends Error {
   constructor() {
-    super("Team management is locked because this auction is already live or completed.");
+    super("Team management is locked because the auction has already started.");
     this.name = "TeamManagementLockedError";
   }
 }
@@ -47,15 +61,9 @@ export async function listAvailableTeamCaptains(
 }
 
 export async function createTeam(auctionId: string, input: CreateTeamInput) {
-  console.info("[createTeam] auctionId:", auctionId);
-  console.info("[createTeam] Firestore path:", `auctions/${auctionId}/teams`);
-  console.info("[createTeam] input:", input);
-
   const inputValidation = createTeamSchema.safeParse(input);
-  console.info("[createTeam] input validation:", inputValidation.success);
 
   if (!inputValidation.success) {
-    console.error("[createTeam] input validation error:", inputValidation.error);
     throw inputValidation.error;
   }
 
@@ -77,37 +85,52 @@ export async function createTeam(auctionId: string, input: CreateTeamInput) {
         purchasePrice: 0,
         isCaptain: true,
         joinedAt: Timestamp.now(),
-        
       },
     ],
     playersCount: 1,
   };
   const teamValidation = teamSchema.safeParse(teamCandidate);
-  console.info("[createTeam] team validation:", teamValidation.success);
 
   if (!teamValidation.success) {
-    console.error("[createTeam] team validation error:", teamValidation.error);
     throw teamValidation.error;
   }
 
   const team = validateInput(teamSchema, teamCandidate);
 
-  try {
-    return await addDocument(auctionTeamsCollection(auctionId), {
-      ...team,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("[createTeam] Firestore write failed:", error);
-    throw error;
-  }
+  return addDocument(auctionTeamsCollection(auctionId), {
+    ...team,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateTeam(
+  auctionId: string,
+  teamId: string,
+  input: UpdateTeamInput,
+) {
+  await assertTeamManagementOpen(auctionId);
+  const data = teamSchema.pick({ name: true, color: true }).parse(input);
+
+  return mergeDocument(auctionTeamDoc(auctionId, teamId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteTeam(auctionId: string, teamId: string) {
+  await assertTeamManagementOpen(auctionId);
+  return removeDocument(auctionTeamDoc(auctionId, teamId));
 }
 
 async function assertTeamManagementOpen(auctionId: string) {
   const auction = await getAuction(auctionId);
 
-  if (auction?.status === "Live" || auction?.status === "Completed") {
+  if (!auction) {
+    throw new Error("Auction was not found.");
+  }
+
+  if (auction.status !== "Draft") {
     throw new TeamManagementLockedError();
   }
 }

@@ -7,14 +7,20 @@ import {
   CheckCircle2,
   Loader2,
   Play,
+  Radio,
+  RotateCcw,
   UsersRound,
   XCircle,
 } from "lucide-react";
 import { getAuctionDashboard } from "@/services/auction-dashboard-service";
-import { startAuction } from "@/services/auctions-service";
+import {
+  resetAuctionToDraft,
+  startAuction,
+} from "@/services/auctions-service";
 import type { AuctionDocument, TeamDocument } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/utils/cn";
 
 type AuctionDashboardState =
   | { status: "loading" }
@@ -39,6 +45,15 @@ export function AuctionDashboardClient({ auctionId }: { auctionId: string }) {
   });
   const [startError, setStartError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  async function refreshDashboard() {
+    const dashboard = await getAuctionDashboard(auctionId);
+    setState({
+      status: "ready",
+      ...dashboard,
+    });
+  }
 
   useEffect(() => {
     let active = true;
@@ -118,6 +133,7 @@ export function AuctionDashboardClient({ auctionId }: { auctionId: string }) {
 
           try {
             await startAuction(auctionId);
+            window.dispatchEvent(new Event("auction-navigation-refresh"));
             router.push(`/auctions/${auctionId}/live`);
           } catch (error) {
             setStartError(getErrorMessage(error));
@@ -125,6 +141,28 @@ export function AuctionDashboardClient({ auctionId }: { auctionId: string }) {
             setStarting(false);
           }
         }}
+        onResetToDraft={async () => {
+          if (!window.confirm("Reset this auction to Draft for development?")) {
+            return;
+          }
+
+          setResetting(true);
+          setStartError(null);
+
+          try {
+            await resetAuctionToDraft(auctionId);
+            await refreshDashboard();
+            window.dispatchEvent(new Event("auction-navigation-refresh"));
+          } catch (error) {
+            setStartError(getErrorMessage(error));
+          } finally {
+            setResetting(false);
+          }
+        }}
+        onContinue={() => {
+          router.push(`/auctions/${auctionId}/live`);
+        }}
+        resetting={resetting}
         startError={startError}
         starting={starting}
         teams={teams}
@@ -171,7 +209,12 @@ function AuctionOverview({ auction }: { auction: AuctionDocument | null }) {
           </h2>
           <p className="mt-2 text-sm text-slate-400">{formatDate(auction.date)}</p>
         </div>
-        <span className="w-fit rounded-md border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">
+        <span
+          className={cn(
+            "w-fit rounded-md border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em]",
+            getStatusBadgeClasses(auction.status),
+          )}
+        >
           {auction.status}
         </span>
       </div>
@@ -244,14 +287,20 @@ function TeamsSection({
 function ReadinessSection({
   activePlayersCount,
   auction,
+  onContinue,
+  onResetToDraft,
   onStart,
+  resetting,
   startError,
   starting,
   teams,
 }: {
   activePlayersCount: number;
   auction: AuctionDocument | null;
+  onContinue: () => void;
+  onResetToDraft: () => Promise<void>;
   onStart: () => Promise<void>;
+  resetting: boolean;
   startError: string | null;
   starting: boolean;
   teams: TeamDocument[];
@@ -265,6 +314,8 @@ function ReadinessSection({
   const disabledReason =
     statusBlockReason ?? readiness.find((item) => !item.passed)?.reason;
   const canStart = allReady && !statusBlockReason;
+  const isLive = auction?.status === "Live";
+  const isCompleted = auction?.status === "Completed";
 
   return (
     <Card className="p-6">
@@ -278,20 +329,48 @@ function ReadinessSection({
           </h3>
         </div>
         <div className="flex flex-col items-start gap-2 lg:items-end">
-          <Button type="button" disabled={!canStart || starting} onClick={onStart}>
-            {starting ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Play className="size-4" aria-hidden="true" />
-            )}
-            {starting ? "Starting..." : "Start Auction"}
-          </Button>
-          {!canStart && disabledReason ? (
+          {isLive ? (
+            <Button type="button" onClick={onContinue}>
+              <Radio className="size-4" aria-hidden="true" />
+              Continue Live Auction
+            </Button>
+          ) : null}
+          {!isLive && !isCompleted ? (
+            <Button type="button" disabled={!canStart || starting} onClick={onStart}>
+              {starting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Play className="size-4" aria-hidden="true" />
+              )}
+              {starting ? "Starting..." : "Start Auction"}
+            </Button>
+          ) : null}
+          {isCompleted ? (
+            <p className="max-w-sm text-sm text-slate-300">
+              This auction is completed.
+            </p>
+          ) : null}
+          {!isLive && !isCompleted && !canStart && disabledReason ? (
             <p className="max-w-sm text-sm text-red-200">{disabledReason}</p>
           ) : null}
           {startError ? (
             <p className="max-w-sm text-sm text-red-200">{startError}</p>
           ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={resetting}
+            onClick={() => {
+              void onResetToDraft();
+            }}
+          >
+            {resetting ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <RotateCcw className="size-4" aria-hidden="true" />
+            )}
+            Reset Auction to Draft
+          </Button>
         </div>
       </div>
 
@@ -384,6 +463,18 @@ function InfoTile({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-semibold text-white">{value}</p>
     </div>
   );
+}
+
+function getStatusBadgeClasses(status: AuctionDocument["status"]) {
+  if (status === "Live") {
+    return "border-emerald-300/25 bg-emerald-300/10 text-emerald-200";
+  }
+
+  if (status === "Completed") {
+    return "border-slate-300/25 bg-slate-300/10 text-slate-200";
+  }
+
+  return "border-cyan-300/25 bg-cyan-300/10 text-cyan-200";
 }
 
 function formatDate(value: AuctionDocument["date"]) {

@@ -5,8 +5,11 @@ import { useForm } from "react-hook-form";
 import {
   CheckCircle2,
   Loader2,
+  MoreVertical,
+  Pencil,
   Plus,
   Shield,
+  Trash2,
   Trophy,
   X,
   XCircle,
@@ -15,10 +18,12 @@ import { teamSchema } from "@/lib/firebase/schema";
 import { getAuction } from "@/services/auctions-service";
 import {
   createTeam,
+  deleteTeam,
   DuplicateTeamCaptainError,
   listAvailableTeamCaptains,
   listTeams,
   TeamManagementLockedError,
+  updateTeam,
 } from "@/services/teams-service";
 import type {
   AuctionDocument,
@@ -42,10 +47,19 @@ type ToastState = {
   message: string;
 } | null;
 
+type EditTeamFormValues = {
+  name: string;
+  color: string;
+};
+
 const TEAM_BUDGET = 400;
 const teamFormSchema = teamSchema.pick({
   name: true,
   captainId: true,
+  color: true,
+});
+const editTeamFormSchema = teamSchema.pick({
+  name: true,
   color: true,
 });
 
@@ -62,6 +76,8 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
   const [players, setPlayers] = useState<PlayerDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<TeamDocument | null>(null);
+  const [deletingTeam, setDeletingTeam] = useState<TeamDocument | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
   const loadData = useCallback(async () => {
@@ -93,8 +109,7 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
     () => players.filter((player) => player.active),
     [players],
   );
-  const teamManagementLocked =
-    auction?.status === "Live" || auction?.status === "Completed";
+  const teamManagementLocked = auction ? auction.status !== "Draft" : false;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -112,7 +127,7 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
         </div>
         {teamManagementLocked ? (
           <p className="rounded-md border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-100">
-            Team management is locked while this auction is {auction.status}.
+            Team management is locked because the auction has already started.
           </p>
         ) : null}
         <Button
@@ -125,7 +140,13 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
         </Button>
       </div>
 
-      <TeamsList loading={loading} teams={teams} />
+      <TeamsList
+        locked={teamManagementLocked}
+        loading={loading}
+        onDelete={setDeletingTeam}
+        onEdit={setEditingTeam}
+        teams={teams}
+      />
 
       {open ? (
         <CreateTeamDialog
@@ -142,7 +163,6 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
             await loadData();
           }}
           onError={(error) => {
-            console.error("[CreateTeamDialog] exact createTeam error:", error);
             setToast({
               type: "error",
               message:
@@ -156,18 +176,78 @@ export function TeamsClient({ auctionId }: { auctionId: string }) {
         />
       ) : null}
 
+      {editingTeam ? (
+        <EditTeamDialog
+          team={editingTeam}
+          onClose={() => setEditingTeam(null)}
+          onSaved={async (values) => {
+            try {
+              await updateTeam(auctionId, editingTeam.id, values);
+              setEditingTeam(null);
+              setToast({
+                type: "success",
+                message: "Team updated successfully.",
+              });
+              await loadData();
+            } catch (error) {
+              setToast({
+                type: "error",
+                message:
+                  error instanceof TeamManagementLockedError
+                    ? error.message
+                    : getErrorMessage(error),
+              });
+            }
+          }}
+        />
+      ) : null}
+
+      {deletingTeam ? (
+        <DeleteTeamDialog
+          team={deletingTeam}
+          onClose={() => setDeletingTeam(null)}
+          onConfirm={async () => {
+            try {
+              await deleteTeam(auctionId, deletingTeam.id);
+              setDeletingTeam(null);
+              setToast({
+                type: "success",
+                message: "Team deleted successfully.",
+              });
+              await loadData();
+            } catch (error) {
+              setToast({
+                type: "error",
+                message:
+                  error instanceof TeamManagementLockedError
+                    ? error.message
+                    : getErrorMessage(error),
+              });
+            }
+          }}
+        />
+      ) : null}
+
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
 
 function TeamsList({
+  locked,
   loading,
+  onDelete,
+  onEdit,
   teams,
 }: {
+  locked: boolean;
   loading: boolean;
+  onDelete: (team: TeamDocument) => void;
+  onEdit: (team: TeamDocument) => void;
   teams: TeamDocument[];
 }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   if (loading) {
     return (
       <Card className="flex min-h-56 items-center justify-center p-8 text-slate-300">
@@ -192,7 +272,7 @@ function TeamsList({
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {teams.map((team) => (
-        <Card key={team.id} className="overflow-hidden">
+        <Card key={team.id} className="overflow-visible">
           <div
             className="h-2"
             style={{ backgroundColor: team.color }}
@@ -214,6 +294,47 @@ function TeamsList({
                 style={{ backgroundColor: team.color }}
                 aria-label={`${team.name} team color`}
               />
+              {!locked ? (
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="size-10 px-0"
+                    aria-label={`Open actions for ${team.name}`}
+                    onClick={() =>
+                      setOpenMenuId(openMenuId === team.id ? null : team.id)
+                    }
+                  >
+                    <MoreVertical className="size-5" aria-hidden="true" />
+                  </Button>
+                  {openMenuId === team.id ? (
+                    <div className="absolute right-0 top-11 z-20 w-40 rounded-md border border-white/10 bg-slate-950 p-1 shadow-2xl shadow-black/40">
+                      <button
+                        type="button"
+                        className="flex min-h-9 w-full items-center gap-2 rounded px-3 text-left text-sm font-semibold text-slate-200 hover:bg-white/8"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          onEdit(team);
+                        }}
+                      >
+                        <Pencil className="size-4" aria-hidden="true" />
+                        Edit Team
+                      </button>
+                      <button
+                        type="button"
+                        className="flex min-h-9 w-full items-center gap-2 rounded px-3 text-left text-sm font-semibold text-red-200 hover:bg-red-300/10"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          onDelete(team);
+                        }}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        Delete Team
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
@@ -397,6 +518,165 @@ function CreateTeamDialog({
             </Button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function EditTeamDialog({
+  onClose,
+  onSaved,
+  team,
+}: {
+  onClose: () => void;
+  onSaved: (values: EditTeamFormValues) => Promise<void>;
+  team: TeamDocument;
+}) {
+  const {
+    formState: { errors, isSubmitting },
+    handleSubmit,
+    register,
+    setError,
+  } = useForm<EditTeamFormValues>({
+    defaultValues: {
+      name: team.name,
+      color: team.color,
+    },
+  });
+
+  async function onSubmit(values: EditTeamFormValues) {
+    const parsed = editTeamFormSchema.safeParse(values);
+
+    if (!parsed.success) {
+      parsed.error.issues.forEach((issue) => {
+        const field = issue.path[0];
+        if (typeof field === "string") {
+          setError(field as keyof EditTeamFormValues, {
+            message: issue.message,
+          });
+        }
+      });
+      return;
+    }
+
+    await onSaved(parsed.data);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4 backdrop-blur">
+      <div className="w-full max-w-xl rounded-lg border border-white/10 bg-slate-950 shadow-2xl shadow-black/40">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+              Team Management
+            </p>
+            <h3 className="mt-1 text-xl font-bold text-white">Edit Team</h3>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="size-10 px-0"
+            onClick={onClose}
+            aria-label="Close edit team dialog"
+          >
+            <X className="size-5" aria-hidden="true" />
+          </Button>
+        </div>
+
+        <form className="grid gap-4 p-5" onSubmit={handleSubmit(onSubmit)}>
+          <Field label="Team Name" error={errors.name?.message} required>
+            <input
+              className={inputClasses}
+              placeholder="Team name"
+              {...register("name")}
+            />
+          </Field>
+
+          <Field label="Team Color" error={errors.color?.message} required>
+            <div className="flex items-center gap-3">
+              <input
+                className="size-11 rounded-md border border-white/10 bg-slate-900 p-1"
+                type="color"
+                {...register("color")}
+              />
+              <input className={inputClasses} {...register("color")} />
+            </div>
+          </Field>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Pencil className="size-4" aria-hidden="true" />
+              )}
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DeleteTeamDialog({
+  onClose,
+  onConfirm,
+  team,
+}: {
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  team: TeamDocument;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleConfirm() {
+    setDeleting(true);
+
+    try {
+      await onConfirm();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-4 backdrop-blur">
+      <div className="w-full max-w-md rounded-lg border border-white/10 bg-slate-950 shadow-2xl shadow-black/40">
+        <div className="border-b border-white/10 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-200">
+            Delete Team
+          </p>
+          <h3 className="mt-1 text-xl font-bold text-white">{team.name}</h3>
+        </div>
+
+        <div className="grid gap-4 p-5">
+          <p className="text-sm leading-6 text-slate-300">
+            This removes the team from the current auction only. This action
+            cannot be undone.
+          </p>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={deleting}
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button type="button" disabled={deleting} onClick={handleConfirm}>
+              {deleting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 className="size-4" aria-hidden="true" />
+              )}
+              Delete Team
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

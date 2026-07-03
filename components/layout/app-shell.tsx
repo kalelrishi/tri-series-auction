@@ -4,27 +4,90 @@ import { motion } from "framer-motion";
 import { Menu, Radio, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { navigationItems } from "@/components/layout/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getActiveLiveAuction } from "@/services/auctions-service";
 import { cn } from "@/utils/cn";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
+type NavigationItem = {
+  label: string;
+  href: string;
+  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+};
+
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const [liveAuctionHref, setLiveAuctionHref] = useState<string | null>(null);
+  const allNavigationItems = useMemo<NavigationItem[]>(
+    () =>
+      liveAuctionHref
+        ? [
+            ...navigationItems,
+            { label: "Live Auction", href: liveAuctionHref, icon: Radio },
+          ]
+        : [...navigationItems],
+    [liveAuctionHref],
+  );
   const currentPage =
-    navigationItems.find((item) => item.href === pathname)?.label ?? "Auction";
+    allNavigationItems.find((item) => item.href === pathname)?.label ??
+    "Auction";
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadLiveAuctionNavItem() {
+      try {
+        const liveAuction = await getActiveLiveAuction();
+
+        if (active) {
+          setLiveAuctionHref(
+            liveAuction ? `/auctions/${liveAuction.id}/live` : null,
+          );
+        }
+      } catch {
+        if (active) {
+          setLiveAuctionHref(null);
+        }
+      }
+    }
+
+    function refreshLiveAuctionNavItem() {
+      void loadLiveAuctionNavItem();
+    }
+
+    refreshLiveAuctionNavItem();
+    window.addEventListener(
+      "auction-navigation-refresh",
+      refreshLiveAuctionNavItem,
+    );
+
+    return () => {
+      active = false;
+      window.removeEventListener(
+        "auction-navigation-refresh",
+        refreshLiveAuctionNavItem,
+      );
+    };
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.18),transparent_34%),linear-gradient(135deg,#020617_0%,#0f172a_45%,#111827_100%)]" />
       <div className="flex min-h-screen">
         <aside className="hidden w-72 shrink-0 border-r border-white/10 bg-slate-950/80 px-4 py-5 backdrop-blur lg:block">
-          <SidebarContent pathname={pathname} />
+          <SidebarContent items={allNavigationItems} pathname={pathname} />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -63,7 +126,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <nav className="border-b border-white/10 bg-slate-950/72 px-3 py-2 backdrop-blur lg:hidden">
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {navigationItems.map((item) => {
+              {allNavigationItems.map((item) => {
                 const active = item.href === pathname;
                 return (
                   <Link
@@ -74,7 +137,7 @@ export function AppShell({ children }: AppShellProps) {
                       active && "bg-emerald-300/15 text-emerald-100",
                     )}
                   >
-                    <item.icon className="size-4" aria-hidden="true" />
+                    <item.icon className="size-4" aria-hidden={true} />
                     {item.label}
                   </Link>
                 );
@@ -89,7 +152,13 @@ export function AppShell({ children }: AppShellProps) {
   );
 }
 
-function SidebarContent({ pathname }: { pathname: string }) {
+function SidebarContent({
+  items,
+  pathname,
+}: {
+  items: NavigationItem[];
+  pathname: string;
+}) {
   return (
     <div className="flex h-full flex-col">
       <Link href="/" className="group flex items-center gap-3 px-2 py-2">
@@ -105,7 +174,7 @@ function SidebarContent({ pathname }: { pathname: string }) {
       </Link>
 
       <div className="mt-7 space-y-1">
-        {navigationItems.map((item) => {
+        {items.map((item) => {
           const active = item.href === pathname;
           return (
             <Link
@@ -125,7 +194,7 @@ function SidebarContent({ pathname }: { pathname: string }) {
               ) : null}
               <item.icon
                 className={cn("relative size-5", active && "text-emerald-200")}
-                aria-hidden="true"
+                aria-hidden={true}
               />
               <span className="relative">{item.label}</span>
             </Link>
