@@ -67,6 +67,9 @@ export type AuctionDocument = BaseDocument & {
   startingBudget: number;
   maxPlayersPerTeam: number;
   currentPlayerId: string | null;
+  currentBid: number | null;
+  leadingTeamId: string | null;
+  leadingTeamName: string | null;
   currentTurnTeamId: string | null;
   startedAt: FirestoreTimestamp | null;
   endedAt: FirestoreTimestamp | null;

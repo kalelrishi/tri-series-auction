@@ -240,9 +240,11 @@ export function PlayersClient() {
             await loadPlayers();
           }}
           onError={(error) => {
+            void error;
             setToast({
               type: "error",
-              message: getErrorMessage(error),
+              message:
+                "Unable to save player. Please check the form and try again.",
             });
           }}
         />
@@ -554,9 +556,7 @@ function PlayerDialog({
   });
 
   async function onSubmit(values: PlayerFormValues) {
-    console.info("[PlayerDialog] form payload before validation:", values);
     const parsed = playerFormSchema.safeParse(values);
-    console.info("[PlayerDialog] schema validation result:", parsed);
 
     if (!parsed.success) {
       parsed.error.issues.forEach((issue) => {
@@ -572,7 +572,6 @@ function PlayerDialog({
 
     try {
       const data = cleanPlayerInput(parsed.data);
-      console.info("[PlayerDialog] cleaned player payload:", data);
       if (player) {
         await updatePlayer(player.id, data);
       } else {
@@ -581,7 +580,6 @@ function PlayerDialog({
       reset(defaultValues);
       await onSaved();
     } catch (error) {
-      console.error("[PlayerDialog] save player failed:", error);
       onError(error);
     }
   }
@@ -831,18 +829,6 @@ function emptyToUndefined(value: string | undefined) {
 
 function formatPoints(points: number) {
   return new Intl.NumberFormat("en-IN").format(points);
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  return "Unknown player save error. Check the browser console for details.";
 }
 
 const inputClasses =

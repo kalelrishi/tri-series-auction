@@ -5,7 +5,6 @@ import {
   playersCollection,
   typedQuery,
 } from "@/lib/firebase/refs";
-import { ROOT_COLLECTIONS } from "@/lib/firebase/paths";
 import { playerSchema } from "@/lib/firebase/schema";
 import {
   addDocument,
@@ -25,25 +24,12 @@ export async function listPlayers() {
 }
 
 export async function createPlayer(input: CreatePlayerInput) {
-  console.info("[createPlayer] payload before validation:", input);
-
-  const validation = playerSchema.safeParse(input);
-  console.info("[createPlayer] schema validation result:", validation);
-
   const data = validateInput(playerSchema, input);
-  const collectionPath = ROOT_COLLECTIONS.players;
-  console.info("[createPlayer] Firestore write path:", collectionPath);
-
-  try {
-    return await addDocument(playersCollection(), {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error("[createPlayer] Firestore write failed:", error);
-    throw error;
-  }
+  return addDocument(playersCollection(), {
+    ...omitUndefinedProperties(data),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function updatePlayer(
@@ -52,7 +38,15 @@ export async function updatePlayer(
 ) {
   const data = playerSchema.partial().parse(input);
   return mergeDocument(playerDoc(playerId), {
-    ...data,
+    ...omitUndefinedProperties(data),
     updatedAt: serverTimestamp(),
   });
+}
+
+function omitUndefinedProperties<T extends Record<string, unknown>>(value: T) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined),
+  ) as {
+    [K in keyof T as undefined extends T[K] ? K : K]: Exclude<T[K], undefined>;
+  };
 }
