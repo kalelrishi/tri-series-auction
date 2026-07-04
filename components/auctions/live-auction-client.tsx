@@ -423,7 +423,13 @@ function LiveAuctionOverview({
       </div>
 
       {auctionComplete ? (
-        <AuctionCompleteSummary history={history} teams={teams} />
+        isCaptain && captainTeamId ? (
+          <CaptainAuctionCompleteSummary
+            team={teams.find((team) => team.id === captainTeamId) ?? null}
+          />
+        ) : (
+          <AuctionCompleteSummary history={history} teams={teams} />
+        )
       ) : null}
 
       {currentPlayer ? (
@@ -533,6 +539,73 @@ function AuctionCompleteSummary({
           </div>
         ))}
       </div>
+    </Card>
+  );
+}
+
+function CaptainAuctionCompleteSummary({ team }: { team: TeamDocument | null }) {
+  const players = team?.players ?? [];
+  const purchasedPlayers = players.filter((player) => !player.isCaptain);
+  const totalSpent = players.reduce(
+    (sum, player) => sum + player.purchasePrice,
+    0,
+  );
+
+  return (
+    <Card className="mt-5 border-emerald-300/20 bg-emerald-300/10 p-5">
+      <p className="text-lg font-bold text-white">Auction Completed</p>
+      <p className="mt-2 text-sm text-emerald-100">
+        Your final squad is locked and available below.
+      </p>
+      {team ? (
+        <>
+          <div className="mt-4 flex items-center gap-3">
+            <span
+              className="size-8 rounded-md border border-white/15"
+              style={{ backgroundColor: team.color }}
+              aria-label={`${team.name} team color`}
+            />
+            <div>
+              <p className="font-semibold text-white">{team.name}</p>
+              <p className="text-sm text-slate-300">
+                Captain: {team.captainName}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <InfoTile label="Final Squad" value={String(players.length)} />
+            <InfoTile
+              label="Purchased Players"
+              value={String(purchasedPlayers.length)}
+            />
+            <InfoTile label="Total Spent" value={formatPoints(totalSpent)} />
+            <InfoTile
+              label="Remaining Budget"
+              value={formatPoints(team.budgetRemaining)}
+            />
+          </div>
+          <div className="mt-4 grid gap-2">
+            {players.map((player) => (
+              <div
+                key={player.playerId}
+                className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-slate-950/40 p-3 text-sm"
+              >
+                <span className="min-w-0 truncate text-slate-100">
+                  {player.playerName}
+                  {player.isCaptain ? " (Captain)" : ""}
+                </span>
+                <span className="shrink-0 font-semibold text-emerald-100">
+                  {formatPoints(player.purchasePrice)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-slate-300">
+          Team details are unavailable for this captain session.
+        </p>
+      )}
     </Card>
   );
 }

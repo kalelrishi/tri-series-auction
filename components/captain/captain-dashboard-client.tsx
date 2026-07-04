@@ -5,6 +5,7 @@ import { Loader2, Radio, Trophy, Users, XCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getCaptainDashboardData,
+  subscribeToCaptainDashboardData,
   type CaptainDashboardData,
 } from "@/services/captain-dashboard-service";
 import { Card } from "@/components/ui/card";
@@ -23,34 +24,43 @@ export function CaptainDashboardClient() {
       return;
     }
 
-    const session = captainSession;
-    let active = true;
+    setState({ status: "loading" });
 
-    async function loadDashboard() {
-      try {
-        const data = await getCaptainDashboardData(
-          session.auctionId,
-          session.teamId,
+    const unsubscribe = subscribeToCaptainDashboardData(
+      captainSession.auctionId,
+      captainSession.teamId,
+      (data) => {
+        setState({ status: "ready", data });
+      },
+      () => {
+        setState({
+          status: "error",
+          message: "Unable to load captain dashboard right now.",
+        });
+      },
+    );
+
+    void getCaptainDashboardData(
+      captainSession.auctionId,
+      captainSession.teamId,
+    )
+      .then((data) => {
+        setState((previous) =>
+          previous.status === "loading" ? { status: "ready", data } : previous,
         );
+      })
+      .catch(() => {
+        setState((previous) =>
+          previous.status === "loading"
+            ? {
+                status: "error",
+                message: "Unable to load captain dashboard right now.",
+              }
+            : previous,
+        );
+      });
 
-        if (active) {
-          setState({ status: "ready", data });
-        }
-      } catch {
-        if (active) {
-          setState({
-            status: "error",
-            message: "Unable to load captain dashboard right now.",
-          });
-        }
-      }
-    }
-
-    void loadDashboard();
-
-    return () => {
-      active = false;
-    };
+    return unsubscribe;
   }, [captainSession]);
 
   if (!captainSession || state.status === "loading") {
@@ -75,6 +85,13 @@ export function CaptainDashboardClient() {
   }
 
   const { auction, currentPlayer, team } = state.data;
+  const players = team?.players ?? [];
+  const purchasedPlayers = players.filter((player) => !player.isCaptain);
+  const totalSpent = players.reduce(
+    (sum, player) => sum + player.purchasePrice,
+    0,
+  );
+  const auctionCompleted = auction?.status === "Completed";
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
@@ -82,9 +99,18 @@ export function CaptainDashboardClient() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">
           Captain Dashboard
         </p>
-        <h2 className="mt-2 text-3xl font-black tracking-normal text-white">
-          {team?.name ?? captainSession.teamName}
-        </h2>
+        <div className="mt-2 flex items-center gap-3">
+          {team?.color ? (
+            <span
+              className="size-9 rounded-md border border-white/15"
+              style={{ backgroundColor: team.color }}
+              aria-label={`${team.name} team color`}
+            />
+          ) : null}
+          <h2 className="text-3xl font-black tracking-normal text-white">
+            {team?.name ?? captainSession.teamName}
+          </h2>
+        </div>
         <p className="mt-2 text-sm text-slate-400">
           Captain: {team?.captainName ?? captainSession.captainName}
         </p>
@@ -108,16 +134,48 @@ export function CaptainDashboardClient() {
         />
         <InfoCard
           icon={<Radio className="size-5 text-cyan-200" />}
-          label="Leading Team"
-          value={auction?.leadingTeamName ?? "No bids yet"}
+          label="Total Spent"
+          value={formatPoints(totalSpent)}
         />
       </section>
 
+      {auctionCompleted ? (
+        <Card className="border-emerald-300/20 bg-emerald-300/10 p-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">
+            Auction Completed
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <InfoTile
+              label="Final Squad"
+              value={String(players.length)}
+            />
+            <InfoTile
+              label="Purchased Players"
+              value={String(purchasedPlayers.length)}
+            />
+            <InfoTile
+              label="Remaining Budget"
+              value={formatPoints(team?.budgetRemaining ?? 0)}
+            />
+          </div>
+        </Card>
+      ) : (
+        <InfoCard
+          icon={<Radio className="size-5 text-cyan-200" />}
+          label="Leading Team"
+          value={auction?.leadingTeamName ?? "No bids yet"}
+        />
+      )}
+
       <Card className="p-5">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
-          Live Auction
+          {auctionCompleted ? "Final Auction State" : "Live Auction"}
         </p>
-        {currentPlayer ? (
+        {auctionCompleted ? (
+          <p className="mt-4 text-sm text-slate-300">
+            The auction has ended. Your final squad is available below.
+          </p>
+        ) : currentPlayer ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <InfoTile label="Current Player" value={currentPlayer.name} />
             <InfoTile label="Role" value={currentPlayer.role} />
@@ -141,18 +199,35 @@ export function CaptainDashboardClient() {
 
       <Card className="p-5">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-200">
-          Players
+          Final Squad
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {(team?.players ?? []).map((player) => (
+          {players.map((player) => (
             <div
               key={player.playerId}
               className="rounded-md border border-white/10 bg-white/[0.04] p-3"
             >
-              <p className="font-semibold text-white">{player.playerName}</p>
-              <p className="mt-1 text-sm text-slate-400">{player.role}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-white">
+                    {player.playerName}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {player.role}
+                    {player.isCaptain ? " · Captain" : ""}
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-semibold text-emerald-100">
+                  {formatPoints(player.purchasePrice)}
+                </p>
+              </div>
             </div>
           ))}
+          {players.length === 0 ? (
+            <p className="rounded-md border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-400">
+              No players assigned yet.
+            </p>
+          ) : null}
         </div>
       </Card>
     </div>

@@ -448,7 +448,18 @@ function CreateTeamDialog({
     register,
     reset,
     setError,
+    setValue,
+    watch,
   } = useForm<TeamFormValues>({ defaultValues });
+  const selectedColor = watch("color") || defaultValues.color;
+
+  function handleColorChange(color: string) {
+    setValue("color", color, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }
 
   async function onSubmit(values: TeamFormValues) {
     if (locked) {
@@ -480,13 +491,9 @@ function CreateTeamDialog({
       color: values.color,
       budgetTotal: TEAM_BUDGET,
     };
-    console.info("[CreateTeamDialog] auctionId:", auctionId);
-    console.info("[CreateTeamDialog] createTeam payload:", payload);
     const parsed = teamFormSchema.safeParse(payload);
-    console.info("[CreateTeamDialog] form validation:", parsed.success);
 
     if (!parsed.success) {
-      console.error("[CreateTeamDialog] form validation error:", parsed.error);
       parsed.error.issues.forEach((issue) => {
         const field = issue.path[0];
         if (typeof field === "string" && field in defaultValues) {
@@ -554,7 +561,8 @@ function CreateTeamDialog({
                 <input
                   className="size-11 rounded-md border border-white/10 bg-slate-900 p-1"
                   type="color"
-                  {...register("color")}
+                  value={selectedColor}
+                  onChange={(event) => handleColorChange(event.target.value)}
                 />
                 <input className={inputClasses} {...register("color")} />
               </div>
@@ -606,12 +614,23 @@ function EditTeamDialog({
     handleSubmit,
     register,
     setError,
+    setValue,
+    watch,
   } = useForm<EditTeamFormValues>({
     defaultValues: {
       name: team.name,
       color: team.color,
     },
   });
+  const selectedColor = watch("color") || defaultValues.color;
+
+  function handleColorChange(color: string) {
+    setValue("color", color, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }
 
   async function onSubmit(values: EditTeamFormValues) {
     const parsed = editTeamFormSchema.safeParse(values);
@@ -666,7 +685,8 @@ function EditTeamDialog({
               <input
                 className="size-11 rounded-md border border-white/10 bg-slate-900 p-1"
                 type="color"
-                {...register("color")}
+                value={selectedColor}
+                onChange={(event) => handleColorChange(event.target.value)}
               />
               <input className={inputClasses} {...register("color")} />
             </div>
