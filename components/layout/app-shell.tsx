@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Trophy,
   UserRound,
-  UsersRound,
+  //UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -298,7 +298,7 @@ function getNavigationItems(
       { label: "Dashboard", href: "/admin", icon: Shield },
       { label: "Players", href: "/players", icon: UserRound },
       { label: "Auctions", href: "/auctions", icon: CalendarDays },
-      { label: "Teams", href: "/teams", icon: UsersRound },
+      //{ label: "Teams", href: "/teams", icon: UsersRound },
     ];
 
     if (liveAuctionHref) {
